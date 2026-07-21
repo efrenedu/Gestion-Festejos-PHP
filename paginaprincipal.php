@@ -118,7 +118,7 @@ if(count($_SESSION)>0){
 	    $foto=$dat_foto[0][0];
      }
      if($foto!="" && $foto!="..."){
-	    echo "<div class='box_image'><image id='welcome_img' src='".$foto."' width='150' height='150'/></div>";
+	    echo "<div class='box_image'><image id='welcome_img' src='images/".$foto."' width='150' height='150'/></div>";
      }
      else{
        echo "<div class='box_image'><image id='welcome_img' src='images/user_login.jpg' width='150' height='150'/></div>";

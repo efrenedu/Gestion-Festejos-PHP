@@ -192,9 +192,12 @@ if(count($_POST)>0){
 			if(isset($_FILES["foto"])){
 				   copy($_FILES["foto"]["tmp_name"],$_FILES["foto"]["name"]);
                    $nombre=$_FILES["foto"]["name"];
-                   $dir=$nombre;
+                   $dir="images".DIRECTORY_SEPARATOR.$nombre;
                    move_uploaded_file($_FILES["foto"]["tmp_name"],$dir);
-				   update_data("usuario",["foto"],[$dir],1,["nombre_usuario"],[$usuario]);
+				   update_data("usuario",["foto"],[$nombre],1,["nombre_usuario"],[$usuario]);
+			       if(file_exists(__DIR__.DIRECTORY_SEPARATOR.$nombre)){
+						unlink(__DIR__.DIRECTORY_SEPARATOR.$nombre);
+				   }
 			}
 			else{
 
