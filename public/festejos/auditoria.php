@@ -66,25 +66,37 @@
 <div  id="content2">
 <?php  
 
+/*Verify No Exist Illegal Access*/
+require_once __DIR__."/../../private/festejos/jwt.php";
 session_start();
-//Verify No Exist Ilegal Access from User
 if(count($_SESSION)>0){
-  $usuario = $_SESSION['username'];
-  $nivel=$_SESSION['acceso_user'];
-  if (!isset($usuario)) {
-	header("location: loggin.php");
-  }
-  else{
-	  if($nivel!="administrador"){
-	      header("location: paginaprincipal.php"); 
-		  exit();
-      }
-	  $_SESSION['lastPage_user']="auditoria.php"; 
-  }
-  
+     $path_keySecret=__DIR__."/../../private/festejos/secretToken.json";
+     if(!file_exists($path_keySecret)){
+	     echo "<div id='error_msg'><h2 id='error_text'>Error Obteniendo Datos del Token del Servidor</h2></div>";
+	     echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+         echo "<a class='boton1' href='salir.php'>Volver</a>";
+	     echo "</div>";
+	     exit;
+     }
+     $data_secretKey=json_decode(file_get_contents($path_keySecret),true);
+	 $token=$_SESSION["Token_User"];
+	 $res=validar_token($token,$data_secretKey["Token"]);
+	 if($res["Valido"]=="False"){
+		header("location: salir.php");
+		exit;
+    }
+	$dat=$res["Message"];
+	$permiso=$dat["Acceso"];
+	if($permiso!="administrador"){
+		header("location: paginaprincipal.php");
+        exit();
+	}
+	$_SESSION['lastPage_user']="auditoria.php"; 
+  	
 }
 else{
-	header("location: loggin.php");
+	 header("location: loggin.php");
+	 exit();
 }
 ?>
   <h2 id="title1">Auditoria</h2>
@@ -119,21 +131,23 @@ else{
    
    /*write nodes html of  table and filters*/
    
-   require "conexion_bd.php"; 
+   require_once __DIR__."/../../private/festejos/db_config.php";
    echo "<div id='filtro1' style='display:none;' >
    <label for='filtro_name' style='margin-left:2%';> valor del filtro</label>
    <select id='filtro_name' name='filtro_name'>
      <option value='' selected>Elegir</option>
    ";
-   $conectado=false;
-   if(validar_conexion()){
+   $conectado=get_conexion();
+   if($conectado=="OK"){
 	 $conectado=true;
-	 $data_users=get_data_dict("usuario",["nombre_usuario"],1,-1,-1);
-	 if(count($data_users)>0){
-	    for ($i=0;$i<count($data_users);$i++){
+	 $data_users=get_data("usuario",["nombre_usuario"],null,null,true);
+	 if($data_users["status"]!="Error"){
+		$data_users=$data_users["message"];
+		for ($i=0;$i<count($data_users);$i++){
 		   echo"<option value='".$data_users[$i]["nombre_usuario"]."'>".$data_users[$i]["nombre_usuario"]."</option>";  
-	   }
+	    } 
 	 }
+	 
    }
    echo"</select></div><br>";
    echo"<input type='button' class='boton_login' name='consultar' value='Consultar' style='margin-right:5%;' onclick='auditoria()'><input type='reset' class='boton_login' name='Limpiar' value='Limpiar'>";
@@ -142,10 +156,11 @@ else{
    echo"<div class='Table_Container'><table>";
    echo"<tr style='padding:3px;text-align:center;background-color:rgb(49,75,141);color:white'><td>Usuario</td><td>Accion Realizada</td><td>Fecha</td><td>Hora</td></tr>";
 
-   if($conectado==true){
-	 $data=get_data_dict("reporte_usuario",["nombre_usuario","accion","fecha","hora"],4,-1,-1);
-     $contador=0;
-	 if(count($data)>0){
+   if($conectado=="OK"){
+	 $data=get_data("reporte_usuario",["nombre_usuario","accion","fecha","hora"],null,null,true);
+     if($data["status"]!="Error"){
+		$data=$data["message"]; 
+		$contador=0;
 		foreach($data as $dat){
 		    if($contador<30){
 			   echo "<tr style='width:25%;background:rgb(231,238,255);'>";
@@ -158,6 +173,7 @@ else{
 			}
 		}
 	 }
+	 
    }
    echo"</table></div>";
    

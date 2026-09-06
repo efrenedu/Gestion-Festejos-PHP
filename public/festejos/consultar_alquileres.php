@@ -79,34 +79,48 @@
     <br><br>
 <?php  
 /*Verify no Exist Illegal Access from User*/
-   session_start();
-   if(count($_SESSION)>0){
-	   $usuario = $_SESSION['username'];
-       $nivel=$_SESSION['acceso_user'];
-	   if (!isset($usuario)) {
-	      header("location: loggin.php");
-		  exit();
-      }
-	  else{
-		   $_SESSION['lastPage_user']="consultar_alquiler.php"; 
-	  }
-   }
-   else{
-	    header("location: loggin.php");
-		exit();
-   }
-
-  //add the list of Rented Products to the table component
-  require "conexion_bd.php";
-  echo "<div class='Table_Container'><table id='tabla'><tr style='padding:3px;text-align:center;background-color:rgb(49,75,141);color:white'><td>Producto</td><td>Formato</td><td>Cantidad</td><td>CI Cliente</td><td>Fecha Devolucion</td></tr>";
-  if(validar_conexion()){
-    $data=get_data("producto_alquilado",["nombre_producto","formato","cantidad_alquilada","CI_cliente","fecha_devolucion"],5,-1,-1);
-    if(count($data)>0){
-      foreach ($data as $row){
-        echo"<tr style='width:25%;background:rgb(255,250,239);'><td>".$row[0]."</td><td>".$row[1]."</td><td>".$row[2]."</td><td>".$row[3]."</td><td>".$row[4]."</td></tr>"; 
-      }
-    } 
-  }
+require_once __DIR__."/../../private/festejos/jwt.php";
+session_start();
+if(count($_SESSION)>0){
+     $path_keySecret=__DIR__."/../../private/festejos/secretToken.json";
+     if(!file_exists($path_keySecret)){
+	     echo "<div id='error_msg'><h2 id='error_text'>Error Obteniendo Datos del Token del Servidor</h2></div>";
+	     echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+         echo "<a class='boton1' href='salir.php'>Volver</a>";
+	     echo "</div>";
+	     exit;
+     }
+     $data_secretKey=json_decode(file_get_contents($path_keySecret),true);
+	 $token=$_SESSION["Token_User"];
+	 $res=validar_token($token,$data_secretKey["Token"]);
+	 if($res["Valido"]=="False"){
+		header("location: salir.php");
+		exit;
+    }
+	$_SESSION['lastPage_user']="consultar_alquiler.php"; 
+  	
+}
+else{
+	 header("location: loggin.php");
+	 exit();
+}
+  
+require_once __DIR__."/../../private/festejos/db_config.php";
+echo "<div class='Table_Container'><table id='tabla'><tr style='padding:3px;text-align:center;background-color:rgb(49,75,141);color:white'><td>Producto</td><td>Formato</td><td>Cantidad</td><td>CI Cliente</td><td>Fecha Devolucion</td></tr>";
+if(get_conexion()=="OK"){
+    $data=get_data("producto_alquilado",["nombre_producto","formato","cantidad_alquilada","CI_cliente","fecha_devolucion"],null,null,true);
+    if($data["status"]=="Error"){
+		  echo "</table></div><br>";
+		  exit;
+	}
+	$data=$data["message"];
+    foreach ($data as $row){
+        echo"<tr style='width:25%;background:rgb(255,250,239);'><td>".$row["nombre_producto"]."</td><td>".$row["formato"]."</td><td>".$row["cantidad_alquilada"]."</td><td>".$row["CI_cliente"]."</td><td>".$row["fecha_devolucion"]."</td></tr>"; 
+    }
+    
+}	
+   
+  
   
   echo "</table></div><br>";
 ?>

@@ -68,21 +68,32 @@
 <?php  
 
 //Verify No Exist Ilegal Access from User
+require_once __DIR__."/../../private/festejos/jwt.php";
 session_start();
 if(count($_SESSION)>0){
-  $usuario = $_SESSION['username'];
-  $nivel=$_SESSION['acceso_user'];
-  if (!isset($usuario)) {
-	  header("location: loggin.php");
-	  exit();
-  }
-  else{
-	 if($nivel=="Visitante"){
-	    header("location: paginaprincipal.php");
-        exit();		 
+     $path_keySecret=__DIR__."/../../private/festejos/secretToken.json";
+     if(!file_exists($path_keySecret)){
+	     echo "<div id='error_msg'><h2 id='error_text'>Error Obteniendo Datos del Token del Servidor</h2></div>";
+	     echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+         echo "<a class='boton1' href='salir.php'>Volver</a>";
+	     echo "</div>";
+	     exit;
      }
-	 $_SESSION['lastPage_user']="alquilar_productos.php"; 
-  }	
+     $data_secretKey=json_decode(file_get_contents($path_keySecret),true);
+	 $token=$_SESSION["Token_User"];
+	 $res=validar_token($token,$data_secretKey["Token"]);
+	 if($res["Valido"]=="False"){
+		header("location: salir.php");
+		exit;
+    }
+	$dat=$res["Message"];
+	$permiso=$dat["Acceso"];
+	if($permiso=="Visitante"){
+		header("location: paginaprincipal.php");
+        exit();
+	}
+	$_SESSION['lastPage_user']="alquilar_productos.php"; 
+  	
 }
 else{
 	 header("location: loggin.php");
@@ -157,10 +168,17 @@ else{
 	        <option value='' >Elegir Producto</option>
 	        <?php
 	       //set the list of products with state "alquilable" on ComboBox(Select) component
-	       require "conexion_bd.php";
-	       if(validar_conexion()){
-		      $dat=get_data_dict("producto",["nombre_producto","cantidad_disponible","precio_alquiler","precio"],4,["alquilable"],["true"]);
-		      if(count($dat)>0){
+           require_once __DIR__."/../../private/festejos/db_config.php";
+
+	       if(get_conexion()=="OK"){
+			  $cond_data=array("conditions_Names"=>array("alquilable"),"conditions_Values"=>array("true"),"condition_Types"=>array("and"),"conditions_Verify"=>array("="));	 
+     
+		      $dat=get_data("producto",["nombre_producto","cantidad_disponible","precio_alquiler","precio"],$cond_data,null,true);
+		      if($dat["status"]=="Error"){
+				  exit;
+			  }
+			  $dat=$dat["message"];
+			  if(count($dat)>0){
 			      for($i=0;$i<count($dat);$i++){
 				      echo "<option value='".$dat[$i]["nombre_producto"].";".$dat[$i]["cantidad_disponible"].",".$dat[$i]["precio_alquiler"].",".$dat[$i]["precio"]."'>".$dat[$i]["nombre_producto"]."</option>";
 			     }

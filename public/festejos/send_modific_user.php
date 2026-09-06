@@ -67,93 +67,220 @@
 <?php  
 
 /*Verify No Exist Illegal Access*/
-  require "conexion_bd.php";
-  session_start();
-  $usuario="";
-  if(count($_SESSION)>0){
-    $usuario = $_SESSION['username'];
-    $nivel=$_SESSION['acceso_user'];
-    if (!isset($usuario)){
-	   header("location: loggin.php"); 
-       exit();	   
-    }
-	else{
-		$last_page= $_SESSION['lastPage_user'];
-		$_SESSION['lastPage_user']="send_modific_user.php";
-        if($last_page!="gestion_usuarios.php"){
-		    header("location: paginaprincipal.php");
-            exit();			
-	   }
-	   if($nivel!="administrador"){
-	       header("location: paginaprincipal.php"); 
-		   exit();
-       }
-	} 
-  }
-  else{  
-	 header("location: loggin.php");
-     exit();	 
-  }
 
-  //process the request
-  if(count($_POST)>0 ){  
-     if(!isset($_POST['accion']) && !isset($_POST["selected_row"])) {
+function generate_pass($num_characters=8){
+	
+	$new_pass="";
+	$specials="!@#$%&*";
+	$numbers="23456789";
+	$characters="abcdefghijkmnopqrstuvwxyzABCDEFGHIJKLMNPQRSTUVWXYZ";
+	$max_len=strlen($characters)-1;
+	for($i=0;$i<$num_characters-2;$i++){
+		$new_pass.=$characters[random_int(0,$max_len)];
+	}
+	$new_pass.=$numbers[random_int(0,strlen($numbers)-1)];
+	$new_pass.=$specials[random_int(0,strlen($specials)-1)];
+	
+	return $new_pass;
+}
+
+session_start();
+require_once __DIR__."/../../private/festejos/db_config.php";  
+require_once __DIR__."/../../private/festejos/jwt.php";
+$usuario="";
+if(count($_SESSION)>0){
+     $path_keySecret=__DIR__."/../../private/festejos/secretToken.json";
+     if(!file_exists($path_keySecret)){
+	     echo "<div id='error_msg'><h2 id='error_text'>Error Obteniendo Datos del Token del Servidor</h2></div>";
+	     echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+         echo "<a class='boton1' href='salir.php'>Volver</a>";
+	     echo "</div>";
+	     exit;
+     }
+     $data_secretKey=json_decode(file_get_contents($path_keySecret),true);
+	 $token=$_SESSION["Token_User"];
+	 $res=validar_token($token,$data_secretKey["Token"]);
+	 if($res["Valido"]=="False"){
+		header("location: salir.php");
+		exit;
+    }
+	$acceso=$res["Message"]["Acceso"];
+	$usuario=$res["Message"]["Id_usr"];
+	if($acceso!="administrador"){
+	     header("location: paginaprincipal.php");
+         exit();		 
+    }
+	$last_page= $_SESSION['lastPage_user'];
+	$_SESSION['lastPage_user']="send_modific_user.php";
+    if($last_page!="gestion_usuarios.php"){
+		header("location: paginaprincipal.php");
+        exit();			
+	}
+  
+}
+else{
+	 header("location: loggin.php");
+	 exit();
+}
+  
+//process the request
+if(count($_POST)<=0){
+	echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+	echo "<div id='error_msg2'><h2 id='error_text'>Error Datos Invalidos</h2></div>";
+	echo "<a class='boton2' href='gestion_usuarios.php' >Aceptar</a>";	  
+    exit;
+}
+if(!isset($_POST['accion']) || !isset($_POST["selected_row"])) {
+	echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+	echo "<div id='error_msg2'><h2 id='error_text'>Error de Datos</h2></div>";
+	echo "<a class='boton2' href='gestion_usuarios.php' >aceptar</a>";
+    exit;
+}
+$accion = $_POST['accion'];
+$user_modif=$_POST['selected_row'];
+$res_conex=get_conexion();
+date_default_timezone_set('America/Caracas');
+
+if($res_conex!="OK"){
+	echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+	echo "<div id='error_msg2'><h2 id='error_text'>Fallo al Conectar</h2></div>";
+	echo "<a class='boton2' href='gestion_usuarios.php' >Aceptar</a>"; 
+	exit; 
+}
+
+$exist_user=id_exist("usuario","nombre_usuario", $user_modif);
+if($exist_user["status"]=="Error"){
+	 echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+	 echo "<div id='error_msg2'><h2 id='error_text'>Error: {$exist_user['message']}</h2></div>";
+	 echo "<a class='boton2' href='gestion_usuarios.php' >Aceptar</a>";
+	 exit;	
+}
+
+if($exist_user["message"]!="True"){
+	 echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+	 echo "<div id='error_msg2'><h2 id='error_text'>Usuario Inexistente </h2></div>";
+	 echo "<a class='boton2' href='gestion_usuarios.php' >Aceptar</a>";
+	 exit;	
+}
+
+$extra_msg="";
+if($accion=="permiso"){
+	if(!isset($_POST["permiso"])){
 		echo "<image src='images/incorrecto.png' width='120' height='120'/>";
-		echo "<div id='error_msg2'><h2 id='error_text'>Error de Datos</h2></div>";
+		echo "<div id='error_msg2'><h2 id='error_text'>Datos Invalidos</h2></div>";
 		echo "<a class='boton2' href='gestion_usuarios.php' >aceptar</a>";
-     }
-     else{
-	    $accion = $_POST['accion'];
-	    $user_modif=$_POST['selected_row'];
-        if(validar_conexion()){
-             if(id_exist("usuario","nombre_usuario", $user_modif)){
-					 if($accion=="permiso"){
-						 if(!isset($_POST["permiso"])){
-							 echo "<image src='images/incorrecto.png' width='120' height='120'/>";
-		                     echo "<div id='error_msg2'><h2 id='error_text'>Error de Data</h2></div>";
-		                     echo "<a class='boton2' href='gestion_usuarios.php' >aceptar</a>";
-						 }
-						 else{
-						     update_data("usuario",["permiso"],[$_POST["permiso"]],1,["nombre_usuario"],[$user_modif]);
-						 } 
-					 }
-					 else if($accion=="desbloquear"){
-						update_data("usuario",["bloqueado"],["false"],1,["nombre_usuario"],[$user_modif]);
-                        $id_intento=get_data_dict("usuario",["id_intento"],1,["nombre_usuario"],[$user_modif])[0]["id_intento"];
-						update_data("intentos_usuario",["num_intentos","last_fecha","last_hora"],["0","...","..."],3,["id_intento"],[$id_intento]);
-					 }
-					 else if($accion=="reset pass"){
-						update_data("usuario",["contrasena"],[$default_pass_user],1,["nombre_usuario"],[$user_modif]);
-					 }
-					 else if($accion=="borrar user"){
-						  $dat_usr=get_data_dict("usuario",["id_intento"],1,["nombre_usuario"],[$user_modif]);
-						  delete_data("pregunta_secreta",["nombre_usuario"],[$user_modif]);  
-						  delete_data("usuario",["nombre_usuario"],[$user_modif]);
-					      delete_data("intentos_usuario",["id_intento"],[$dat_usr[0]["id_intento"]]);
-					 }
-					 add_data("reporte_usuario",[generate_id("reporte_usuario","id_reporte_usr",true),$usuario,"Modificar Usuarios",strval(date("d-m-Y")),strval(date("H:i:s"))],5);
-					 echo "<image src='images/correcto.png' width='120' height='120'/>";
-		             echo "<div id='correcto_msg'><h2 id='correcto_text'>Modificacion Realizada Satsifactoriamente</h2></div>";
-		             echo "<a id='boton_acceptar' class='boton2' href='paginaprincipal.php' >Aceptar</a>";
-			 }
-			 else{
-				  echo "<image src='images/incorrecto.png' width='120' height='120'/>";
-		          echo "<div id='error_msg2'><h2 id='error_text'>Error Usuario no Existente</h2></div>";
-		          echo "<a class='boton2' href='paginaprincipal.php' >Aceptar</a>";
-			 }
-	   }
-	   else{
-		  echo "<image src='images/incorrecto.png' width='120' height='120'/>";
-		  echo "<div id='error_msg2'><h2 id='error_text'>Fallo al Conectar</h2></div>";
-		  echo "<a class='boton2' href='paginaprincipal.php' >Aceptar</a>"; 
-	   }
-     }
-  }
-  else{
-	 	echo "<image src='images/incorrecto.png' width='120' height='120'/>";
-		echo "<div id='error_msg2'><h2 id='error_text'>Error Datos Invalidos</h2></div>";
-		echo "<a class='boton2' href='paginaprincipal.php' >Aceptar</a>";	  
-  }
+	    exit;
+	}
+	$next_permiso=$_POST["permiso"];
+	if($next_permiso=="administrador"){
+		echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+		echo "<div id='error_msg2'><h2 id='error_text'>No se Puede Cambiar el Permiso a Usuario Administrador</h2></div>";
+		echo "<a class='boton2' href='gestion_usuarios.php' >aceptar</a>";
+	    exit;
+	}
+	$cond_data=array("conditions_Names"=>array("nombre_usuario"),"conditions_Values"=>array($user_modif),"condition_Types"=>array("and"),"conditions_Verify"=>array("="));	 	  		
+	$res_update=update_data("usuario",array("permiso"=>$next_permiso),$cond_data,null);
+	if($res_update["status"]=="Error"){
+        echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+		echo "<div id='error_msg2'><h2 id='error_text'>Error: {$res_update['message']}</h2></div>";
+		echo "<a class='boton2' href='gestion_usuarios.php' >aceptar</a>";
+	    exit;
+	}		
+}
+else if($accion=="desbloquear"){
+	$cond_data=array("conditions_Names"=>array("nombre_usuario"),"conditions_Values"=>array($user_modif),"condition_Types"=>array("and"),"conditions_Verify"=>array("="));	 	  		
+	$join_data=array();
+	$join_data["intentos_usuario"]=array("query_field"=>array("num_intentos"=>"0","last_fecha"=>"...","last_hora"=>"..."),"share_fields"=>array("field"=>"id_intento","table_reference"=>"usuario"),"Conditions_join"=>null);				   
+	$res_update=update_data("usuario",array("bloqueado"=>"false"),$cond_data,$join_data);
+    if($res_update["status"]=="Error"){
+        echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+		echo "<div id='error_msg2'><h2 id='error_text'>Error: {$res_update['message']}</h2></div>";
+		echo "<a class='boton2' href='gestion_usuarios.php' >aceptar</a>";
+	    exit;
+	}
+}
+else if($accion=="reset pass"){
+	$next_pass=generate_pass(12);
+	$pass_hash=password_hash($next_pass,PASSWORD_BCRYPT);
+	$cond_data=array("conditions_Names"=>array("nombre_usuario"),"conditions_Values"=>array($user_modif),"condition_Types"=>array("and"),"conditions_Verify"=>array("="));	 	  		
+	$res_update=update_data("usuario",array("contrasena"=>$pass_hash),$cond_data);
+    if($res_update["status"]=="Error"){
+        echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+		echo "<div id='error_msg2'><h2 id='error_text'>Error: {$res_update['message']}</h2></div>";
+		echo "<a class='boton2' href='gestion_usuarios.php' >aceptar</a>";
+	    exit;
+	}
+	$extra_msg= "<p>Password Restablecido a {$next_pass} , Por Avisele lo Antes Posible al Usuario para que lo Modifique</p>";
+	
+}
+else if($accion=="borrar user"){
+	$cond_data=array("conditions_Names"=>array("nombre_usuario"),"conditions_Values"=>array($user_modif),"condition_Types"=>array("and"),"conditions_Verify"=>array("="));	 	  		
+	$dat_usr=get_data("usuario",["id_intento"],$cond_data,null,true);
+	if($dat_usr["status"]=="Error"){
+		echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+		echo "<div id='error_msg2'><h2 id='error_text'>Error: {$dat_usr['message']}</h2></div>";
+		echo "<a class='boton2' href='gestion_usuarios.php' >aceptar</a>";
+	    exit;
+	}
+	$dat_usr=$dat_usr["message"];
+	$res_del=delete_data("reporte_usuario",$cond_data);
+	if($res_del["status"]=="Error"){
+		echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+		echo "<div id='error_msg2'><h2 id='error_text'>Error: {$res_del['message']}</h2></div>";
+		echo "<a class='boton2' href='gestion_usuarios.php' >aceptar</a>";
+	    exit;
+	}
+	$res_del=delete_data("pregunta_secreta",$cond_data);
+	if($res_del["status"]=="Error"){
+		echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+		echo "<div id='error_msg2'><h2 id='error_text'>Error: {$res_del['message']}</h2></div>";
+		echo "<a class='boton2' href='gestion_usuarios.php' >aceptar</a>";
+	    exit;
+	}
+	$res_del=delete_data("usuario",$cond_data);
+	if($res_del["status"]=="Error"){
+		echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+		echo "<div id='error_msg2'><h2 id='error_text'>Error: {$res_del['message']}</h2></div>";
+		echo "<a class='boton2' href='gestion_usuarios.php' >aceptar</a>";
+	    exit;
+	}
+	$cond_data=array("conditions_Names"=>array("id_intento"),"conditions_Values"=>array($dat_usr[0]["id_intento"]),"condition_Types"=>array("and"),"conditions_Verify"=>array("="));	 	  		
+	$res_del=delete_data("intentos_usuario",$cond_data);
+	if($res_del["status"]=="Error"){
+		echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+		echo "<div id='error_msg2'><h2 id='error_text'>Error: {$res_del['message']}</h2></div>";
+		echo "<a class='boton2' href='gestion_usuarios.php' >aceptar</a>";
+	    exit;
+	}
+}
+$id_report=generate_id("reporte_usuario","id_reporte_usr");
+if($id_report["status"]=="Error"){
+	echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+	echo "<div id='error_msg2'><h2 id='error_text'>Error: {$id_report['message']}</h2></div>";
+	echo "<a class='boton2' href='gestion_usuarios.php' >aceptar</a>";
+	exit;
+}
+$id_report=$id_report["message"];
+$dat_report=array("id_reporte_usr"=>$id_report,"nombre_usuario"=>$usuario,"accion"=>"Modificar Usuarios","fecha"=>strval(date("d-m-Y")),"hora"=>strval(date("H:i:s")));
+$res_add=add_data("reporte_usuario",$dat_report,true,true);
+if($res_add["status"]=="Error"){
+	echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+	echo "<div id='error_msg2'><h2 id='error_text'>Error: {$res_add['message']}</h2></div>";
+	echo "<a class='boton2' href='gestion_usuarios.php' >aceptar</a>";
+	exit;
+}
+
+echo "<image src='images/correcto.png' width='120' height='120'/>";
+if($extra_msg!=""){
+	echo $extra_msg;
+}
+echo "<div id='correcto_msg'><h2 id='correcto_text'>Modificacion Realizada Satsifactoriamente</h2></div>";
+echo "<a id='boton_acceptar' class='boton2' href='gestion_usuarios.php' >Aceptar</a>";
+			
+	  
+     
+
+
 
 ?>
 

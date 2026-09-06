@@ -67,24 +67,36 @@
 <?php  
 
 /*Verify No Exist Illegal Access*/
+require_once __DIR__."/../../private/festejos/jwt.php";
 session_start();
 if(count($_SESSION)>0){
-  $usuario = $_SESSION['username'];
-  $nivel=$_SESSION['acceso_user'];
-  if (!isset($usuario)) {
-	 header("location: loggin.php");
-  }
-  else{
-	   if($nivel!="administrador"){
-	      header("location: paginaprincipal.php"); 
-          exit();		  
-       }
-	   $_SESSION['lastPage_user']="asignar_administrador.php";  
-  }
-  
+     $path_keySecret=__DIR__."/../../private/festejos/secretToken.json";
+     if(!file_exists($path_keySecret)){
+	     echo "<div id='error_msg'><h2 id='error_text'>Error Obteniendo Datos del Token del Servidor</h2></div>";
+	     echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+         echo "<a class='boton1' href='salir.php'>Volver</a>";
+	     echo "</div>";
+	     exit;
+     }
+     $data_secretKey=json_decode(file_get_contents($path_keySecret),true);
+	 $token=$_SESSION["Token_User"];
+	 $res=validar_token($token,$data_secretKey["Token"]);
+	 if($res["Valido"]=="False"){
+		header("location: salir.php");
+		exit;
+    }
+	$dat=$res["Message"];
+	$permiso=$dat["Acceso"];
+	if($permiso!="administrador"){
+		header("location: paginaprincipal.php");
+        exit();
+	}
+	$_SESSION['lastPage_user']="asignar_administrador.php"; 
+  	
 }
 else{
-	header("location: loggin.php");
+	 header("location: loggin.php");
+	 exit();
 }
 ?>
   <h2 id="title1">Cambiar Administrador</h2>
@@ -92,58 +104,65 @@ else{
     <label for="trabajador"  class="label_login" > Nuevo Administrador: </label><br><br>
 	<select id="trabajador" name="trabajador">
 	   <?php
-	      require "conexion_bd.php";
-		  if(validar_conexion()){
-			$listado=get_data_dict("trabajador",["CI_trabaj","id_nombre","cargo","nivel_academico"],4,-1,-1);
-			$data_user=get_data_dict("usuario",["CI_trabaj"],1,["nombre_usuario"],["admin"]);
-			$id_admin="000000";
-			if(count($data_user)>0){
+	      require_once __DIR__."/../../private/festejos/db_config.php";
+          if(get_conexion()!="OK"){
+			  echo "<option value='' selected>Elegir</option>";
+			  exit;
+		  }
+		  $join_data=array();
+          $join_data["nombre"]=array("query_field"=>array("nombre","segundo_nombre","apellido","segundo_apellido"),"share_fields"=>array("field"=>"id_nombre","table_reference"=>"trabajador"),"Conditions_join"=>null);
+		  $cond_data=array("conditions_Names"=>array("CI_trabaj","cargo"),"conditions_Values"=>array("000000","directivo"),"condition_Types"=>array("and","and"),"conditions_Verify"=>array("!=","="));	 
+		  $listado=get_data("trabajador",["CI_trabaj","id_nombre","nivel_academico"],$cond_data,$join_data,true);
+		  if($listado["status"]=="Error"){
+			  echo "<option value='' selected>Elegir</option>";
+			  exit; 
+		  }
+		  $listado=$listado["message"];
+		  $cond_data=array("conditions_Names"=>array("permiso"),"conditions_Values"=>array("administrador"),"condition_Types"=>array("and"),"conditions_Verify"=>array("="));	 
+		 
+		  $data_user=get_data("usuario",["CI_trabaj"],$cond_data,null,true);
+		  if($data_user["status"]=="Error"){
+			  echo "<option value='' selected>Elegir</option>";
+			  exit; 
+		  }
+		  $data_user=$data_user["message"];
+		  $id_admin="000000";
+		  if(count($data_user)<=0 || count($listado)<=0){
+			   echo "<option value='' selected>Elegir</option>";
+			   exit;   
+		  }
+		  if(count($data_user)>0){
 				$id_admin=$data_user[0]["CI_trabaj"];
-			}
-			if(count($listado>0)){
-				if($id_admin=="000000"){
-					 echo "<option value='' selected>Elegir</option>";
+		  }
+		  $id_admin=$data_user[0]["CI_trabaj"];
+		  $selected="";
+		  if($id_admin=="000000"){
+			  $selected="selected";
+		  }
+		  echo "<option value='' {$selected}>Elegir</option>";
+		  for($i=0;$i<count($listado);$i++){
+				$id_name=$listado[$i]["id_nombre"];
+				$cedula=$listado[$i]["CI_trabaj"];
+				$cargo=$listado[$i]["cargo"];
+				$nivel_academic=$listado[$i]["nivel_academico"];
+				$name=$listado[$i]["nombre"];
+				if($listado[$i]["segundo_nombre"]!=""){
+					$name=$name." ".$listado[$i]["segundo_nombre"];  
+				}
+				$name=$name." ".$listado[$i]["apellido"];
+				if($listado[$i]["segundo_apellido"]!=""){
+					$name=$name." ".$listado[$i]["segundo_apellido"];  
+				}
+				if($id_admin==$cedula){
+					echo "<option value='".$cedula."' selected>".$name."</option>";		
 				}
 				else{
-				   echo "<option value=''>Elegir</option>";
+                   echo "<option value='".$cedula."'>".$name."</option>";								   
 				}
-				for($i=0;$i<count($listado);$i++){
-					$id_name=$listado[$i]["id_nombre"];
-					$cedula=$listado[$i]["CI_trabaj"];
-					$cargo=$listado[$i]["cargo"];
-					$nivel_academic=$listado[$i]["nivel_academico"];
-					if($cedula!="000000"){
-						if($cargo=="Directivo"){
-							
-								$data_name=get_data_dict("nombre",["nombre","segundo_nombre","apellido","segundo_apellido"],4,["id_nombre"],[$id_name]);
-								if(count($data_name)>0){
-								   $name=$data_name[0]["nombre"];
-								   if($data_name[0]["segundo_nombre"]!=""){
-									 $name=$name." ".$data_name[0]["segundo_nombre"];  
-								   }
-								   $name=$name." ".$data_name[0]["apellido"];
-								   if($data_name[0]["segundo_apellido"]!=""){
-									 $name=$name." ".$data_name[0]["segundo_apellido"];  
-								   }
-								   if($id_admin==$cedula){
-									    echo "<option value='".$cedula."' selected>".$name."</option>";		
-								   }
-								   else{
-                                        echo "<option value='".$cedula."'>".$name."</option>";								   
-								   }
-								}
-							
-						}
-					}
-				}
-			}
-            else{
-               echo "<option value='' selected>Elegir</option>";
-			}				
+						
 		  }
-		  else{
-			   echo "<option value='' selected>Elegir</option>";
-		  }
+							
+		  
 	   ?>
 	</select>
 	<br>

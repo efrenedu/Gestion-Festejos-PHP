@@ -67,29 +67,38 @@
 <div id="content2">
 
 <?php  
-/*Verify No Exist Illegal Access from User*/
-
+//Verify No Exist Ilegal Access from User
+require_once __DIR__."/../../private/festejos/jwt.php";
 session_start();
 if(count($_SESSION)>0){
-  $usuario = $_SESSION['username'];
-  $nivel=$_SESSION['acceso_user'];
-  if (!isset($usuario)) {
-	  header("location: loggin.php");
-	  exit();
-  }
-  else{
-	  if($nivel=="Visitante"){
-	    header("location: paginaprincipal.php");
-        exit();		 
+     $path_keySecret=__DIR__."/../../private/festejos/secretToken.json";
+     if(!file_exists($path_keySecret)){
+	     echo "<div id='error_msg'><h2 id='error_text'>Error Obteniendo Datos del Token del Servidor</h2></div>";
+	     echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+         echo "<a class='boton1' href='salir.php'>Volver</a>";
+	     echo "</div>";
+	     exit;
      }
-	 $_SESSION['lastPage_user']="cancelar_fiesta.php"; 
-  }
+     $data_secretKey=json_decode(file_get_contents($path_keySecret),true);
+	 $token=$_SESSION["Token_User"];
+	 $res=validar_token($token,$data_secretKey["Token"]);
+	 if($res["Valido"]=="False"){
+		header("location: salir.php");
+		exit;
+    }
+	$dat=$res["Message"];
+	$permiso=$dat["Acceso"];
+	if($permiso=="Visitante"){
+		header("location: paginaprincipal.php");
+        exit();
+	}
+	$_SESSION['lastPage_user']="cancelar_fiesta.php"; 
+  	
 }
 else{
 	 header("location: loggin.php");
 	 exit();
 }
-
 
 ?>
   <h2 id="title1">Cancelar Fiesta</h2>
@@ -98,35 +107,49 @@ else{
     <select onchange="get_fiestas()" id="cliente" name="cliente" size="1">
 <?php
   /*set the list of Clients Requested a Party */
-    require "conexion_bd.php";
+    require_once __DIR__."/../../private/festejos/db_config.php";
     echo "<option value=''>Elegir</option>";
 		
-    if(validar_conexion()){
-	   $data=get_data_dict("cliente",["CI_cliente","id_nombre"],2,-1,-1);
-	   if(count($data)>0){
-		 for($i=0;$i<count($data);$i++){			 
-			 $valor=$data[$i]["CI_cliente"];
-			 $texto="";
-			 $data_nombre=get_data_dict("nombre",["nombre","segundo_nombre","apellido","segundo_apellido"],4,["id_nombre"],[$data[$i]["id_nombre"]]);
-			 if(count($data_nombre)>0){
-				$nombre=$data_nombre[0]["nombre"]." ";
-				if($data_nombre[0]["segundo_nombre"]!=""){
-					$nombre=$nombre.$data_nombre[0]["segundo_nombre"]." ";
-				}
-				$nombre=$nombre.$data_nombre[0]["apellido"];
-				if($data_nombre[0]["segundo_apellido"]!=""){
-					$nombre=$nombre." ".$data_nombre[0]["segundo_apellido"];
-				}
-				$texto=$nombre;
-			 }
-			 $dat_fiest=get_data_dict("fiesta",["CI_cliente","id_fiesta"],2,["CI_cliente"],[$data[$i]["CI_cliente"]]);
-		     if(count($dat_fiest)>0){
-				 echo "<option value='".$valor."'>".$texto."</option>";
-			 
-			 }			
-		 }
-	  }
-    }
+    if(get_conexion()!="OK"){
+		exit;
+	}
+	
+    $join_data=array();
+    $join_data["nombre"]=array("query_field"=>array("nombre","segundo_nombre","apellido","segundo_apellido"),"share_fields"=>array("field"=>"id_nombre","table_reference"=>"cliente"),"Conditions_join"=>null);
+		  
+    $data=get_data("cliente",["CI_cliente"],null,$join_data,true);
+	if($data["status"]=="Error"){
+		 exit;
+	}
+	$data=$data["message"];
+	if(count($data)<=0){
+		exit;
+	}
+    for($i=0;$i<count($data);$i++){			 
+		$valor=$data[$i]["CI_cliente"];
+		$texto="";
+		$nombre=$data[0]["nombre"]." ";
+		if($data[0]["segundo_nombre"]!=""){
+			$nombre=$nombre.$data[0]["segundo_nombre"]." ";
+		}
+		$nombre=$nombre.$data[0]["apellido"];
+		if($data_nombre[0]["segundo_apellido"]!=""){
+			$nombre=$nombre." ".$data[0]["segundo_apellido"];
+		}
+		$texto=$nombre;
+		$cond_data=array("conditions_Names"=>array("CI_cliente"),"conditions_Values"=>array($data[$i]["CI_cliente"]),"condition_Types"=>array("and"),"conditions_Verify"=>array("="));	 
+
+		$dat_fiest=get_data("fiesta",["CI_cliente","id_fiesta"],$cond_data,null,true);
+		if($dat_fiest["status"]=="Error"){
+			exit;
+		}
+		$dat_fiest=$dat_fiest["message"];
+		if(count($dat_fiest)>0){
+			echo "<option value='".$valor."'>".$texto."</option>";
+		}			
+	}
+	 
+    
 ?>
     </select>
     <br><br>

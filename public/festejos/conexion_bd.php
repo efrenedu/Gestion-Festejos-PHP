@@ -477,6 +477,7 @@ function id_exist($tabla,$id, $id_value){
 	return $res;
 }
 
+
 /*Generate a Primary Key for a Table Based in the Number of Registers of it*/
 function generate_id($tabla,$id_name,$profundo){
 	global $bd;

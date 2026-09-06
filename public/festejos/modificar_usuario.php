@@ -77,19 +77,33 @@
 
 /*Verify No Exist Access Illegal */
 session_start();
+require_once __DIR__."/../../private/festejos/jwt.php";
 $usuario="";
 if(count($_SESSION)>0){
-  $usuario = $_SESSION['username'];
-  if (!isset($usuario)) {
-	  header("location: loggin.php");
-  }
-  else{
-	  $_SESSION['lastPage_user']="modificar_usuario.php";
-  }
+     $path_keySecret=__DIR__."/../../private/festejos/secretToken.json";
+     if(!file_exists($path_keySecret)){
+	     echo "<div id='error_msg'><h2 id='error_text'>Error Obteniendo Datos del Token del Servidor</h2></div>";
+	     echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+         echo "<a class='boton1' href='salir.php'>Volver</a>";
+	     echo "</div>";
+	     exit;
+     }
+     $data_secretKey=json_decode(file_get_contents($path_keySecret),true);
+	 $token=$_SESSION["Token_User"];
+	 $res=validar_token($token,$data_secretKey["Token"]);
+	 if($res["Valido"]=="False"){
+		header("location: salir.php");
+		exit;
+    }
+	$usuario=$res["Message"]["Id_usr"];
+	$_SESSION['lastPage_user']="modificar_usuario.php";
+  
 }
 else{
 	 header("location: loggin.php");
+	 exit();
 }
+
 ?>
 
   <form id="formu"  action="modifica_user.php" method="post"  enctype="multipart/form-data">

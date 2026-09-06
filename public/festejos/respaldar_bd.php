@@ -65,27 +65,39 @@
 </nav>
 <div  id="content2">
 <?php  
-
-/*Verify No Exist Illegal Access*/
 session_start();
+require_once __DIR__."/../../private/festejos/jwt.php";
+/*Verify No Exist Illegal Access*/
 if(count($_SESSION)>0){
-  $usuario = $_SESSION['username'];
-  $nivel=$_SESSION['acceso_user'];
-  if (!isset($usuario)) {
-	 header("location: loggin.php");
-  }
-  else{
-	   if($nivel!="administrador"){
-	      header("location: paginaprincipal.php"); 
-          exit();		  
-       }
-	   $_SESSION['lastPage_user']="respaldar_bd.php";  
-  }
-  
+     $path_keySecret=__DIR__."/../../private/festejos/secretToken.json";
+     if(!file_exists($path_keySecret)){
+	     echo "<div id='error_msg'><h2 id='error_text'>Error Obteniendo Datos del Token del Servidor</h2></div>";
+	     echo "<image id='error_img' src='images/incorrecto.png' width='150' height='150'/><br><br>";
+         echo "<a class='boton1' href='salir.php'>Volver</a>";
+	     echo "</div>";
+	     exit;
+     }
+     $data_secretKey=json_decode(file_get_contents($path_keySecret),true);
+	 $token=$_SESSION["Token_User"];
+	 $res=validar_token($token,$data_secretKey["Token"]);
+	 if($res["Valido"]=="False"){
+		header("location: salir.php");
+		exit;
+    }
+	$dat=$res["Message"];
+	$permiso=$dat["Acceso"];
+	if($permiso!="administrador"){
+		header("location: paginaprincipal.php");
+        exit();
+	}
+	$_SESSION['lastPage_user']="respaldar_bd.php"; 
+
 }
 else{
-	header("location: loggin.php");
+	 header("location: loggin.php");
+	 exit();
 }
+
 ?>
   <h2 id="title1">Respaldar Base de Datos</h2>
   <form id="formu"  action="respaldo_restore.php" method="post" enctype="multipart/form-data">

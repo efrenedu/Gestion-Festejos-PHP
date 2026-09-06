@@ -17,58 +17,109 @@
 <?php 
 
 /*Verify the User is not Loggin*/
-require "conexion_bd.php";
+require_once __DIR__."/../../private/festejos/db_config.php";
+require_once __DIR__."/../../private/festejos/jwt.php";
 session_start();
 if(count($_SESSION)>0){
-	$usuario = $_SESSION['username'];
-    $nivel=$_SESSION['acceso_user'];
-    if (isset($usuario)) {
-	   header("location: paginaprincipal.php");
-   }
+     $path_keySecret=__DIR__."/../../private/festejos/secretToken.json";
+     if(!file_exists($path_keySecret)){
+	     echo "<div id='error_msg'><h2 id='error_text'>Error Obteniendo Datos del Token del Servidor</h2></div>";
+	     echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+         echo "<a class='boton1' href='salir.php'>Volver</a>";
+	     echo "</div>";
+	     exit;
+     }
+     $data_secretKey=json_decode(file_get_contents($path_keySecret),true);
+	 $token=$_SESSION["Token_User"];
+	 $res=validar_token($token,$data_secretKey["Token"]);
+	 if($res["Valido"]!="False"){
+		header("location: paginaprincipal.php");
+		exit;
+    }
+}
+
+$res_conex=get_conexion();
+if($res_conex!="OK"){
+	
+	echo "<div id='error_msg'><h2 id='error_text'>Error {$res_conex}</h2></div>";
+	echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+    echo "<a class='boton1' href='loggin.php'>Volver</a>";
+    echo "</div>";
+	exit;
 }
 
 /*Modify The Password for a User by request "Forget Password" Option */
-if(validar_conexion()){
-  date_default_timezone_set('America/Caracas');
-  if (count($_POST)>0) {
-	  if(!isset($_POST["target"]) || !isset($_POST["pass1"])){
-		   
-		   echo "<div id='error_msg2'><h2 id='error_text'>Error de Data </h2></div>
-		   <a href='loggin.php' class='boton1'>Aceptar</a>
-		   ";   
-	  }
-	  else{
-		  $target=$_POST["target"];
-		  if(id_exist("usuario","nombre_usuario",$target)==true){
-			  $new_pass=$_POST["pass1"];
-			  $new_pass=encript($new_pass);
-			  update_data("usuario",["contrasena"],[$new_pass],1,["nombre_usuario"],[$target]);
-			  $data_intento=get_data_dict("usuario",["id_intento"],1,["nombre_usuario"],[$target]);
-			  if(count($data_intento)>0){
-				  update_data("intentos_usuario",["num_intentos","last_fecha","last_hora"],["0","...","..."],3,["id_intento"],[$data_intento[0]["id_intento"]]);
-			  }
-			  $data_reporte=array("id_reporte_usr"=>generate_id("reporte_usuario","id_reporte_usr",true) , "nombre_usuario"=>$target , "accion"=>"Recuperar Contrasena" ,"fecha"=>strval(date("d-m-Y")),"hora"=>strval(date("H:i:s")));
-			  add_data_dict("reporte_usuario",$data_reporte);
-			  echo"<h2 id='title1'>Contraseña modificada Exitosamente</h2>
-                  <br><a href='loggin.php' class='boton1'>Aceptar</a>
-				  "; 
-		  }
-		  else{
-			  echo "<div id='error_msg2'><h2 id='error_text'>Usuario Inexistente</h2></div><image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br><a href='loggin.php' class='boton1'>Aceptar</a>";
-		  }
-	  }
-  }
-  else{
-	    echo "<div id='error_msg2'><h2 id='error_text'>Error de Data </h2></div>
-		<br><br><a href='loggin.php' class='boton1'>Aceptar</a>
-		";  
-  }
+date_default_timezone_set('America/Caracas');
+if (count($_POST)<=0) {
+	echo "<div id='error_msg'><h2 id='error_text'>Faltan Datos</h2></div>";
+	echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+    echo "<a class='boton1' href='loggin.php'>Volver</a>";
+    echo "</div>";
+	exit;
 }
-else{
-	  echo "<div id='error_msg2'><h2 id='error_text'>Error de Conexion</h2></div>
-	  <a href='loggin.php' class='boton1'>Aceptar</a>
-	  ";  
+if(!isset($_POST["target"]) || !isset($_POST["pass1"]) ){
+	echo "<div id='error_msg'><h2 id='error_text'>Datos Invalidos</h2></div>";
+	echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+    echo "<a class='boton1' href='loggin.php'>Volver</a>";
+    echo "</div>";
+	exit;
+} 
+$target=$_POST["target"];	
+$exist_usr= id_exist("usuario","nombre_usuario",$target);
+if($exist_usr["status"]=="Error"){
+	echo "<div id='error_msg'><h2 id='error_text'>Error {$exist_usr}</h2></div>";
+	echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+    echo "<a class='boton1' href='loggin.php'>Volver</a>";
+    echo "</div>";
+	exit;
 }
+$exist_usr=$exist_usr["message"];
+if($exist_usr!="True"){
+	echo "<div id='error_msg'><h2 id='error_text'>Usuario Inexistente</h2></div>";
+	echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+    echo "<a class='boton1' href='loggin.php'>Volver</a>";
+    echo "</div>";
+	exit;
+}
+$new_pass=$_POST["pass1"];
+$new_pass=password_hash($new_pass,PASSWORD_BCRYPT);
+$cond_data=array("conditions_Names"=>array("nombre_usuario"),"conditions_Values"=>array($target),"condition_Types"=>array("and"),"conditions_Verify"=>array("="));	 
+$join_data=array();
+$join_data["intentos_usuario"]=array("query_field"=>array("num_intentos"=>"0","last_fecha"=>"...","last_hora"=>"..."),"share_fields"=>array("field"=>"id_intento","table_reference"=>"usuario"),"Conditions_join"=>null);
+$res_update=update_data("usuario",array("contrasena"=>$new_pass),$cond_data,$join_data);
+if($res_update["status"]=="Error"){
+	echo "<div id='error_msg'><h2 id='error_text'>Error {$res_update['message']}</h2></div>";
+	echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+    echo "<a class='boton1' href='loggin.php'>Volver</a>";
+    echo "</div>";
+	exit;
+	
+}
+$id_report=generate_id("reporte_usuario","id_reporte_usr");
+if($id_report["status"]=="Error"){
+	echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+	echo "<div id='error_msg2'><h2 id='error_text'>Error {$id_report['message']} </h2></div>";
+	echo "<a class='boton2' href='paginaprincipal.php' >Aceptar</a>";  
+    exit;
+	
+}
+$id_report=$id_report["message"];
+$data_reporte=array("id_reporte_usr"=>$id_report , "nombre_usuario"=>$target , "accion"=>"Recuperar Contrasena" ,"fecha"=>strval(date("d-m-Y")),"hora"=>strval(date("H:i:s")));
+$res_add=add_data("reporte_usuario",$data_reporte,true,true);
+if($res_add["status"]=="Error"){
+	echo "<div id='error_msg'><h2 id='error_text'>Error {$res_add['message']}</h2></div>";
+	echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+    echo "<a class='boton1' href='loggin.php'>Volver</a>";
+    echo "</div>";
+	exit;
+	
+}
+echo"<h2 id='title1'>Contraseña modificada Exitosamente</h2>
+     <br><a href='loggin.php' class='boton1'>Aceptar</a> "; 
+		  
+	  
+ 
+
 
 
 ?>

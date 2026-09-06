@@ -78,37 +78,51 @@
     <br><br>
 <?php  
 /*Verify no Exist Illegal Access from User*/
-
-    session_start();
-    if(count($_SESSION)>0){
-	  $usuario = $_SESSION['username'];
-      $nivel=$_SESSION['acceso_user'];
-      if (!isset($usuario)) {
-	      header("location: loggin.php");
-		  exit();
+require_once __DIR__."/../../private/festejos/jwt.php";
+session_start();
+if(count($_SESSION)>0){
+     $path_keySecret=__DIR__."/../../private/festejos/secretToken.json";
+     if(!file_exists($path_keySecret)){
+	     echo "<div id='error_msg'><h2 id='error_text'>Error Obteniendo Datos del Token del Servidor</h2></div>";
+	     echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+         echo "<a class='boton1' href='salir.php'>Volver</a>";
+	     echo "</div>";
+	     exit;
      }
-	 else{
-		   $_SESSION['lastPage_user']="consultar_fiestas.php"; 
-	 }
-   }   
-   else{
-	   header("location: loggin.php");
-	   exit();
-   }
-
-//add the list of Party Requests to the table component
-
-   require "conexion_bd.php";
-   echo "<div class='Table_Container'><table id='tabla'><tr style='padding:3px;text-align:center;background-color:rgb(49,75,141);color:white'><td>CI cliente</td><td>Sitio</td><td>Estatus</td><td>Fecha</td><td>Hora</td><td>Publico</td><td>Tipo</td></tr>";
-   if(validar_conexion()){
-      $data=get_data_dict("fiesta",["CI_cliente","lugar","estatus","fecha","hora","publico","tipo_fiesta"],7,-1,-1);
-      if(count($data)>0){
+     $data_secretKey=json_decode(file_get_contents($path_keySecret),true);
+	 $token=$_SESSION["Token_User"];
+	 $res=validar_token($token,$data_secretKey["Token"]);
+	 if($res["Valido"]=="False"){
+		header("location: salir.php");
+		exit;
+    }
+	
+	  $_SESSION['lastPage_user']="consultar_fiestas.php"; 
+  	
+}
+else{
+	 header("location: loggin.php");
+	 exit();
+}
+echo "<div class='Table_Container'><table id='tabla'><tr style='padding:3px;text-align:center;background-color:rgb(49,75,141);color:white'><td>CI cliente</td><td>Sitio</td><td>Estatus</td><td>Fecha</td><td>Hora</td><td>Publico</td><td>Tipo</td></tr>";
+  
+require_once __DIR__."/../../private/festejos/db_config.php";
+if(get_conexion()=="OK"){
+	$data=get_data("fiesta",["CI_cliente","lugar","estatus","fecha","hora","publico","tipo_fiesta"],null,null,true);
+    if($data["status"]=="Error"){
+        echo "</table></div><br>";
+        exit;
+	}
+	$data=$data["message"];
+	if(count($data)>0){
          foreach ($data as $d){
            echo"<tr style='width:25%;background:rgb(255,250,239);'><td>".$d["CI_cliente"]."</td><td>".$d["lugar"]."</td><td>".$d["estatus"]."</td><td>".$d["fecha"]."</td><td>".$d["hora"]."</td><td>".$d["publico"]."</td><td>".$d["tipo_fiesta"]."</td></tr>"; 
          }
-      } 
-   }
-   echo "</table></div><br>";
+   }  
+	 
+ }
+
+echo "</table></div><br>";
 ?>
 
     <input type="button" value="Consultar" onclick="consultar_fiestas()" class="boton_login">

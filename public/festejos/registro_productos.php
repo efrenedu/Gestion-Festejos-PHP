@@ -67,24 +67,37 @@
 <?php  
 
 /*Verify No Exist Illegal Access*/
+require_once __DIR__."/../../private/festejos/jwt.php";
 session_start();
 if(count($_SESSION)>0){
-  $usuario = $_SESSION['username'];
-  $nivel=$_SESSION['acceso_user'];
-  if (!isset($usuario)) {
-	header("location: loggin.php");
-  }
-  else{
-	 if($nivel=="Visitante"){
-	    header("location: paginaprincipal.php");
-        exit();		 
+     $path_keySecret=__DIR__."/../../private/festejos/secretToken.json";
+     if(!file_exists($path_keySecret)){
+	     echo "<div id='error_msg'><h2 id='error_text'>Error Obteniendo Datos del Token del Servidor</h2></div>";
+	     echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+         echo "<a class='boton1' href='salir.php'>Volver</a>";
+	     echo "</div>";
+	     exit;
      }
-	 $_SESSION['lastPage_user']="registro_productos.php"; 
-  }
+     $data_secretKey=json_decode(file_get_contents($path_keySecret),true);
+	 $token=$_SESSION["Token_User"];
+	 $res=validar_token($token,$data_secretKey["Token"]);
+	 if($res["Valido"]=="False"){
+		header("location: salir.php");
+		exit;
+    }
+	$acceso=$res["Message"]["Acceso"];
+	if($acceso=="Visitante"){
+		header("location:paginaprincipal.php");
+	}
+	$_SESSION['lastPage_user']="registro_productos.php"; 
+  	
 }
 else{
-	header("location: loggin.php");
+	 header("location: loggin.php");
+	 exit();
 }
+
+
 
 ?>
   <h2 id="title1">Registrar Productos</h2>
@@ -95,7 +108,7 @@ else{
     <select onchange="select_producto()" name="lista_productos" id="lista_productos" size='1'>
     <?php 
     //fill the "Select" node with the list of products registers
-    require "conexion_bd.php";
+    require_once __DIR__."/../../private/festejos/db_config.php";
     $first_op="<option value=''>Elegir";
     for($k=0;$k<45;$k++){
   	  $first_op=$first_op."&nbsp;";  
@@ -103,15 +116,22 @@ else{
     $first_op=$first_op."</option>";
     echo $first_op;
     $next_html="";
-    if(validar_conexion()){
-	  $listado=get_data_dict("producto",["nombre_producto"],1,-1,-1);
-	  if(count($listado>0)){
-		  for ($i=0;$i<count($listado);$i++){
-			     $valor=$listado[$i]["nombre_producto"];
-				 $next_html= $next_html."<option value='".$valor."'>".$valor."</option>";
-			  }
-		  }  
-    }
+	$res_conex=get_conexion();
+	if($res_conex!="OK"){
+		exit;
+	}
+    $listado=get_data("producto",["nombre_producto"],null,null,true);
+	if($listado["status"]=="Error"){
+		exit;
+	}
+	$listado=$listado["message"];
+	if(count($listado)>0){
+		for ($i=0;$i<count($listado);$i++){
+			 $valor=$listado[$i]["nombre_producto"];
+			 $next_html= $next_html."<option value='".$valor."'>".$valor."</option>";
+		}
+    }  
+    
     if($next_html!=""){
 	   echo $next_html;
     } 

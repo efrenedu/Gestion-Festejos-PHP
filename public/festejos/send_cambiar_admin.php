@@ -67,67 +67,98 @@
 <?php  
 
 /*Verify No Exist Illegal Access*/
+require_once __DIR__."/../../private/festejos/jwt.php";
+require_once __DIR__."/../../private/festejos/db_config.php";
+ 
 session_start();
 $usuario_actual="";
 if(count($_SESSION)>0){
-  $usuario = $_SESSION['username'];
-  $nivel=$_SESSION['acceso_user'];
-  if (!isset($usuario)) {
-	 header("location: loggin.php");
-	 exit();
-  }
-  else{
-	   $usuario_actual=$usuario;
-	   $last_page=$_SESSION['lastPage_user'];
-	   $_SESSION['lastPage_user']="send_cambiar_admin.php";
-	   if($nivel!="administrador"){
-	      header("location: paginaprincipal.php"); 
-          exit();		  
-       }
-	   if($last_page!="asignar_administrador.php"){
+     $path_keySecret=__DIR__."/../../private/festejos/secretToken.json";
+     if(!file_exists($path_keySecret)){
+	     echo "<div id='error_msg'><h2 id='error_text'>Error Obteniendo Datos del Token del Servidor</h2></div>";
+	     echo "<image id='error_img' src='images/incorrecto.png' width='150' height='150'/><br><br>";
+         echo "<a class='boton1' href='salir.php'>Volver</a>";
+	     echo "</div>";
+	     exit;
+     }
+     $data_secretKey=json_decode(file_get_contents($path_keySecret),true);
+	 $token=$_SESSION["Token_User"];
+	 $res=validar_token($token,$data_secretKey["Token"]);
+	 if($res["Valido"]=="False"){
+		header("location: salir.php");
+		exit;
+    }
+	$dat=$res["Message"];
+	$permiso=$dat["Acceso"];
+	$usuario_actual=$res["Message"]["Id_usr"];
+	if($permiso!="administrador"){
+		header("location: paginaprincipal.php");
+        exit();
+	}
+	$last_page=$_SESSION['lastPage_user'];
+	$_SESSION['lastPage_user']="send_cambiar_admin.php"; 
+	if($last_page!="asignar_administrador.php"){
 		  header("location: paginaprincipal.php"); 
           exit();	 
-	   } 
-  }
+	}
+  	
 }
 else{
-	header("location: loggin.php");
-	exit();
+	 header("location: loggin.php");
+	 exit();
+}
+date_default_timezone_set('America/Caracas');
+if(count($_POST)<=0 ){
+	  echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+	  echo "<div id='error_msg2'><h2 id='error_text'>Faltan Datos</h2></div>";
+	  echo "<a class='boton2' href='paginaprincipal.php' >Aceptar</a>";   
+      exit;
+}
+if(!isset($_POST["trabajador"])){
+	  echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+	  echo "<div id='error_msg2'><h2 id='error_text'> Datos Invalidos</h2></div>";
+	  echo "<a class='boton2' href='paginaprincipal.php' >Aceptar</a>";   
+      exit;
+}
+$res_conex=get_conexion();
+if($res_conex!="OK"){
+	echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+	echo "<div id='error_msg2'><h2 id='error_text'>Error {$res_conex} </h2></div>";
+	echo "<a class='boton2' href='paginaprincipal.php' >Aceptar</a>";  
+    exit;
 }
 
-/*process the request*/
-require "conexion_bd.php";
-date_default_timezone_set('America/Caracas');
-
-if(count($_POST)>0 ){
-   if(isset($_POST["trabajador"])){
-	   if(validar_conexion()){
-		    $id_trabaj=$_POST["trabajador"];
-		    update_data("usuario",["CI_Trabaj"],[$id_trabaj],1,["nombre_usuario"],[$usuario_actual]);
-            $data_reporte=["id_reporte_usr"=>strval(generate_id("reporte_usuario","id_reporte_usr",true)),"nombre_usuario"=>$usuario_actual,"accion"=>"Cambiar Administrador","fecha"=>strval(date("d-m-Y")),"hora"=>strval(date("H:i:s"))];
-			add_data_dict("reporte_usuario",$data_reporte);
-		    echo "<image src='correcto.png' width='120' height='120'/>";
-		    echo "<div id='correcto_msg'><h2 id='correcto_text'>Modificacion Realizada Satsifactoriamente</h2></div>";
-		    echo "<a id='boton_acceptar' class='boton2' href='paginaprincipal.php' >Aceptar</a>";
-	   }
-	   else{
-		  	 echo "<image src='incorrecto.png' width='120' height='120'/>";
-		     echo "<div id='error_msg2'><h2 id='error_text'>Error al Conectar con BD</h2></div>";
-		     echo "<a class='boton2' href='paginaprincipal.php' >Aceptar</a>"; 
-	   }
-   }
-   else{
-	  echo "<image src='incorrecto.png' width='120' height='120'/>";
-	  echo "<div id='error_msg2'><h2 id='error_text'>Error Datos Invalidos</h2></div>";
-	  echo "<a class='boton2' href='paginaprincipal.php' >Aceptar</a>";   
-   }
+$id_trabaj=$_POST["trabajador"];
+$cond_data=array("conditions_Names"=>array("nombre_usuario"),"conditions_Values"=>array($usuario_actual),"condition_Types"=>array("and"),"conditions_Verify"=>array("="));	 		  
+$res_update=update_data("usuario",array("CI_trabaj"=>$id_trabaj),$cond_data);
+if($res_update["status"]=="Error"){
+	echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+	echo "<div id='error_msg2'><h2 id='error_text'>Error {$res_update['message']} </h2></div>";
+	echo "<a class='boton2' href='paginaprincipal.php' >Aceptar</a>";  
+    exit;
 	
 }
-else{
-	echo "<image src='incorrecto.png' width='120' height='120'/>";
-	echo "<div id='error_msg2'><h2 id='error_text'>Error Datos Invalidos</h2></div>";
+$id_report=generate_id("reporte_usuario","id_reporte_usr");
+if($id_report["status"]=="Error"){
+	echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+	echo "<div id='error_msg2'><h2 id='error_text'>Error {$id_report['message']} </h2></div>";
 	echo "<a class='boton2' href='paginaprincipal.php' >Aceptar</a>";  
+    exit;
+	
 }
+
+$data_reporte=["id_reporte_usr"=>$id_report["message"],"nombre_usuario"=>$usuario_actual,"accion"=>"Cambiar Administrador","fecha"=>strval(date("d-m-Y")),"hora"=>strval(date("H:i:s"))];
+add_data("reporte_usuario",$data_reporte,true,true);
+echo "<image src='images/correcto.png' width='120' height='120'/>";
+echo "<div id='correcto_msg'><h2 id='correcto_text'>Modificacion Realizada Satsifactoriamente</h2></div>";
+echo "<a id='boton_acceptar' class='boton2' href='paginaprincipal.php' >Aceptar</a>";
+	   
+   
+   
+	
+	
+
+
 ?>
 
 </div>

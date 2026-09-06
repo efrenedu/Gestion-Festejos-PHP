@@ -6,50 +6,34 @@ var myPieChart=null;   //for build Charts
 function ConfirmModalPass(){
 	$("#modalPass").css("display","none");
 	var pass_indicado=$("#passRequired").val();
+	var data_send={"password_required":pass_indicado};
 	if(pass_indicado!=""){
-	   var url="get_passUser.php";
-	   var pass_esperado="";
+	   var url="verify_pass.php";
 	   $.ajax({
-          type: "POST",
+          method: "POST",
           url: url,
-          cache: false,
-          contentType: false,
-		  dataType :"text",
-          processData: false,
+          data:data_send,
           success: function(data) {
-			  var temp="";
-			  var leer=false;
-			  for(var i=0;i<data.length;i++){
-				  if(data[i]==":" && leer==false){
-					  leer=true; 
-				  }
-				  else{
-					  if(leer==true){
-					      temp=temp+data[i];
-					  }
-				  }
+			  if(data=="False"){
+				  $("#error_msgPass").css("display","block");
+			      return;
 			  }
-              pass_esperado=temp;
-			  succesModalPass(pass_indicado,pass_esperado);
+			  var dat_split=data.split(":");
+			  if(dat_split[1]!="OK"){
+				  
+				  $("#error_msgPass").css("display","block");
+			      return;
+			  }
+			 ShowModal();
+             $("#error_msg2").css("display","none"); 
+		     $("#error_msg").css("display","none");
+             $("#error_msgPass").css("display","none");
            }
          });
 	}	
 }
 
-/*Verify if the Password Indicate in a Dialog Windows (valor) is the correct password(valor2)*/
-function succesModalPass(valor,valor2){
-	if(valor2!=""){
-	     if(valor2==valor){
-		    ShowModal();
-		    $("#error_msg2").css("display","none"); 
-		    $("#error_msg").css("display","none");
-            $("#error_msgPass").css("display","none");
-		 }
-		 else{
-			$("#error_msgPass").css("display","block");
-		 }
-	  }
-}
+
 
 /*Close Dialog Window for Password Input*/
 function closeModalPass(){
@@ -1209,14 +1193,16 @@ function validar_usuarios(){
   is the Result is Ok , Process the Request
 */
 function validar_cancelar_fiesta(){
+	
 	var valido=0;	
 	var cliente=$("#cliente").find(":selected").val();
 	if(cliente==""){
 		valido=-1;
 	}
 	if(valido==0){
+
 		var ops=document.getElementById("fiestas_cancel").options;	
-        if(ops.length>0){
+		if(ops.length>0){
             if(ops[0].value==''){
 		        valido=-2;
 	        }
@@ -1309,11 +1295,16 @@ function set_trabajador(raw){
 			var temp_dat_telef=temp_raw[1].split("|");
 			var telefs="";
 			var is_admin=false;
+			var no_telef=false;
 			if(temp_dat_telef.length==2){
 				telefs=temp_dat_telef[0];
 				if(temp_dat_telef[1]=="true"){
 					is_admin=true;
 				}
+			}
+			if(telefs==""){
+				telefs="Ningun Telefono Agregado,";
+				no_telef=true;
 			}
 			trabaj_dat=trabaj_dat.split(",");
 			telefs=telefs.split(",");
@@ -1334,7 +1325,11 @@ function set_trabajador(raw){
 				var next_html=""
 				for(var i=0;i<telefs.length;i++){
 					if(telefs[i]!=""){
-					    next_html=next_html+"<option value='"+telefs[i]+"'>"+telefs[i]+"</option>";
+						var value_telef=telefs[i];
+						if(no_telef==true){
+							value_telef="";
+						}
+					    next_html=next_html+"<option value='"+value_telef+"'>"+telefs[i]+"</option>";
 					}
 				}
 				$("#telefonos").html(next_html);
@@ -1345,14 +1340,15 @@ function set_trabajador(raw){
 }
 
 /*Set the Data of Product On the Required Html Nodes*/
-function set_producto(data){	
+function set_producto(data){
+	
 	data=data.split(",");
 	$("#producto").val(data[0]);
 	$("#serial").val(data[1]);
 	$("#precio_alquiler").val(data[2]);
 	$("#cantidad").val(data[3]);
 	$("#precio").val(data[5]);
-	$("#alquilable").val(data[6]);
+	$("input[name='alquilable'][value='"+data[6]+"']").prop("checked",true);
 	var dif=parseInt(data[3])-parseInt(data[4]);
 	$("#cantidad_disp").val(dif.toString());	
 }
@@ -1378,12 +1374,14 @@ function show_trabajador(name){
             data: datos,
             method: "POST",
             url: "get_data_trabajadores.php",
-            success: function(data){		
+            success: function(data){	
+   			
 				if(data.includes(":")){
 					data=data.split(":");
 					var raw=data[1];
 					var next_html="<option value='' selected >Elegir Trabajador</option>";
-					if(raw!=""){
+					
+				    if(raw!="" && data[0]!="Error"){
 						raw=raw.split(";");
 						for(var i=0;i<raw.length;i++){
 							if(raw[i]!=""){
@@ -1704,17 +1702,27 @@ function select_trabajador(){
 				   $("#estatus_label").css("display","inline-block");
 		           $("#estatus").css("display","inline-block");
 				   $("#edad").css("margin-right","0%");
-				   var data_f=data.split(":")[1];
-				   data_f=data_f+"|"+is_admin;
-				   $("#cedula").prop("readonly", true);
-				   $("#boton1").css("display", "none");
-	               $("#boton2").css("display", "inline-block");
-				   set_trabajador(data_f);
+				   var temp_dat=data.split(":")
+				   if(temp_dat[0]=="Error"){
+					  
+					   alert(temp_dat[1]);
+				   }
+				   else{
+					 var data_f=temp_dat[1];
+				     data_f=data_f+"|"+is_admin;
+				     $("#cedula").prop("readonly", true);
+				     $("#boton1").css("display", "none");
+	                 $("#boton2").css("display", "inline-block");
+				     set_trabajador(data_f); 
+				   }
+				   
 			   }
 			   else{
+				   
 				    set_trabajador("");
 			   }  
-		   }
+		   },
+		   
 		 });
 	}
 	else{
@@ -1862,20 +1870,26 @@ function select_producto(){
             data: datos,
             method: "POST",
             url: "get_data_producto.php",
-            success: function(data){			  
+            success: function(data){			
 			   if(data.includes(":")){				   
 				   data=data.split(":");
 				   if(data.length==2){
 					   var raw_data=data[1];
-					   if(raw_data!=""){
-						    $("#serial").prop("readonly", true);
-						    $("#producto").prop("readonly", true);
-		                    $("#boton1").css("display", "none");
-		                    $("#boton2").css("display", "inline-block"); 
-						    $("#cantidad_disp").css("display","inline-block");
-	                     	$("#label_disp").css("display","inline-block");		
-							set_producto(raw_data);
+					   if(data[0]=="Error"){
+						   alert(data[1]);
 					   }
+					   else{
+						   if(raw_data!=""){
+						       $("#serial").prop("readonly", true);
+						       $("#producto").prop("readonly", true);
+		                       $("#boton1").css("display", "none");
+		                       $("#boton2").css("display", "inline-block"); 
+						       $("#cantidad_disp").css("display","inline-block");
+	                     	   $("#label_disp").css("display","inline-block");		
+							   set_producto(raw_data);
+					       }
+					   }
+					   
 				   }				  
 			   }			   
 		   }
@@ -2248,6 +2262,7 @@ function agregar_telefono(){
                       url: "validar_telefono.php",
                       success: function(data){
 						 if(data.includes(":")){
+							 
 							 var respuesta=data.split(":");
 							 var continuar=false;
 							 if(respuesta.length==2){
@@ -2267,6 +2282,7 @@ function agregar_telefono(){
 							    }
 							 }
 							 else{
+								alert(respuesta[1]);
 								showModal_byName("ModalMessage");
 							 }
 						 }
@@ -2936,7 +2952,6 @@ function search_prodClient(){
 //get and show the data required for the chart of stadistics
 function get_dataStadistica(param1,param2,param2_s){		
 	var tabla="";
-	var condiciones={};
 	var cant_fields=0;
 	var lista_params=[];
 	var lista_conds=[-1,-1];
@@ -2958,26 +2973,7 @@ function get_dataStadistica(param1,param2,param2_s){
 	   else{
 		     lista_params=[temp_params];
 	   }
-	   if(temp_cond.includes(",")){
-		   temp_cond2=temp_cond.split(",");
-	   }
-	   else{
-		    temp_cond2=[temp_cond];			
-	   }
-	   var temp_val="";	  
-	   var temp_params3=[[],[]];
-	   var cant_conds=0;
-	   for(var i=0;i<temp_cond2.length;i++){
-			var arr=temp_cond2[i].split("=");
-           	if(arr.length==2){
-                cant_conds=cant_conds+1;
-                temp_params3[0].push(arr[0]);
-				temp_params3[1].push(arr[1]);				
-			}				
-	   }
-	   if(cant_conds>0){
-		   lista_conds=temp_params3;
-	   }		  	  		
+	   		  	  		
 	}
 	else{		
 		if(next_param2.includes(",")){			
@@ -2988,7 +2984,7 @@ function get_dataStadistica(param1,param2,param2_s){
 		}				
 	}	
 	cant_fields=lista_params.length;	
-	var datos={"table":tabla,"fields":lista_params,"num_fields":cant_fields,"conds":lista_conds,"op1":param1,"op2":param2_s};		
+	var datos={"table":tabla,"fields":lista_params,"num_fields":cant_fields,"op1":param1,"op2":param2_s};		
 	$.ajax({
         data: datos,
         method: "POST",
@@ -3025,12 +3021,12 @@ function get_fiestas(){
 	if(cliente!=""){
 		 var datos_search=["id_fiesta","lugar","fecha","publico","tipo_fiesta","costo"];
 	     var table="fiesta";
-	     var datos={"tabla":table,"fields":datos_search,"num_fields":datos_search.length,"filtro":["CI_cliente"],"filtro_val":[cliente]};	    
+	     var datos={"tabla":table,"fields":datos_search,"num_fields":datos_search.length,"filtro":"CI_cliente","filtro_val":cliente};	    
 		 $.ajax({
            data: datos,
            method: "POST",
            url: "realizar_consulta.php",
-           success: function(dat) {			 
+           success: function(dat) {		   
 			   if(dat.includes("?")){
 				  dat=dat.split("?");
 				   if(dat[1]!=""){
@@ -3073,7 +3069,7 @@ function consultar_productosAlquilados(){
 	var filtro_val=$("#filtro_val").val();
 	var filtros_aplicar=[-1,-1];
 	if(filtro!="" && filtro_val!=""){
-		filtros_aplicar=[[filtro],[filtro_val]];
+		filtros_aplicar=[filtro,filtro_val];
 	}
 	var datos_search=["nombre_producto","formato","cantidad_alquilada","CI_cliente","fecha_devolucion"];
 	var table="producto_alquilado";
@@ -3114,11 +3110,11 @@ function consultar_fiestas(){
 	var filtro_val=$("#filtro_val").val();
 	var filtros_aplicar=[-1,-1];
 	if(filtro!="" && filtro_val!=""){
-		filtros_aplicar=[[filtro],[filtro_val]];
+		filtros_aplicar=[filtro,filtro_val];
 	}
 	var datos_search=["CI_cliente","lugar","estatus","fecha","hora","publico","tipo_fiesta"];
 	var table="fiesta";
-	var datos={"tabla":table,"fields":datos_search,"num_fields":datos_search.length,"filtro":filtros_aplicar[0],"filtro_val":filtros_aplicar[1]};
+	var datos={"tabla":table,"fields":datos_search,"filtro":filtros_aplicar[0],"filtro_val":filtros_aplicar[1]};
 	$.ajax({
         data: datos,
         method: "POST",
@@ -3536,7 +3532,7 @@ function iniciar_menu(){
 
 	$.ajax({
         type: "POST",
-        url: "get_id.php",
+        url: "get_user_access.php",
         cache: false,
         contentType: false,
         processData: false,
@@ -3642,7 +3638,7 @@ function Pdf_Consults(args){
 	    title="Productos Alquilados"
 	}
 	if(valid){
-		var datos={"tabla":table,"fields":fields,"num_fields":field_count,"filtro":filter,"filtro_val":filter_val};	    
+		var datos={"tabla":table,"fields":fields,"filtro":filter,"filtro_val":filter_val};	    
 		$.ajax({
            data: datos,
            method: "POST",

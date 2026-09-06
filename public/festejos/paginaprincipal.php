@@ -73,49 +73,54 @@
   if valid set data of user
 */
 
-require "conexion_bd.php";
+require_once __DIR__."/../../private/festejos/db_config.php";
+require_once __DIR__."/../../private/festejos/jwt.php";
+
 session_start();
 
-$usuario = $_SESSION['username'];
-$nivel=$_SESSION['acceso_user'];
-$foto="...";
 
 if(count($_SESSION)>0){
-	if (!isset($usuario)) {
-	   header("location: loggin.php");
-   }
-   else{
+	 if(get_conexion()!="OK"){
+		 echo "<div id='error_msg'><h2 id='error_text'>Error Conectando con el Servidor</h2></div>";
+	     echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+         echo "<a class='boton1' href='loggin.php'>Volver</a>";
+	     echo "</div>";
+	     exit;
+	 }
+	 $path_keySecret=__DIR__."/../../private/festejos/secretToken.json";
+	 if(!file_exists($path_keySecret)){
+	     echo "<div id='error_msg'><h2 id='error_text'>Error Obteniendo Datos del Token del Servidor</h2></div>";
+	     echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+         echo "<a class='boton1' href='loggin.php'>Volver</a>";
+	     echo "</div>";
+	     exit;
+     }
+	 $data_secretKey=json_decode(file_get_contents($path_keySecret),true);
+	 $token=$_SESSION["Token_User"];
+	 $res=validar_token($token,$data_secretKey["Token"]);
+	 if($res["Valido"]=="False"){
+		header("location: loggin.php");
+		exit;
+	 }
+	 $dat_user=$res["Message"];
+	 $user=$dat_user["Id_usr"];
+	 $permiso_user=$dat_user["Acceso"];
+     $worker=$dat_user["CI_trabaj"];
      $_SESSION['lastPage_user']="paginaprincipal.php";
-     $found=false;
-	 if(validar_conexion()){
-		$data_user=get_data_dict("usuario",["CI_trabaj",],1,["nombre_usuario"],[$usuario]);
-		if(count($data_user)>0){
-			$id_trabaj=$data_user[0]["CI_trabaj"];
-			$data_trabaj=get_data_dict("trabajador",["id_nombre"],1,["CI_trabaj"],[$id_trabaj]);
-			if(count($data_trabaj)>0 && $id_trabaj!="000000"){
-			   $id_name=$data_trabaj[0]["id_nombre"];
-			   $data_name=get_data_dict("nombre",["nombre","segundo_nombre","apellido","segundo_apellido"],4,["id_nombre"],[ $id_name]);
-			   if(count($data_name)>0){
-				   $found=true;
-				   $name=$data_name[0]["nombre"];
-				   if($data_name[0]["segundo_nombre"]!=""){
-					   $name=$name." ".$data_name[0]["segundo_nombre"];
-				   }
-				   $name=$name." ".$data_name[0]["apellido"];
-				   if($data_name[0]["segundo_apellido"]!=""){
-					   $name=$name." ".$data_name[0]["segundo_apellido"];
-				   }
-	               echo "<h1 id='msg_welcome'>Bienvenido</h1><h2>".$name."</h2>";
-			   }
-			}
-		}
+	 $cond_data=array("conditions_Names"=>array("nombre_usuario"),"conditions_Values"=>array($user),"condition_Types"=>array("and"),"conditions_Verify"=>array("="));	 
+     $dat_usr_bd=get_data("usuario",["foto"],$cond_data,null,true);
+     if($dat_usr_bd["status"]=="Error"){
+		 echo "<div id='error_msg'><h2 id='error_text'>Error Obteniendo Datos del Usuario</h2></div>";
+	     echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+         echo "<a class='boton1' href='loggin.php'>Volver</a>";
+	     echo "</div>";
+	     exit;
 	 }
-	 if($found==false){
-         echo "<h1 id='msg_welcome'>Bienvenido </h1>";
-	 }
-     $dat_foto=get_data("usuario",["foto"],1,["nombre_usuario"],[$usuario]);
-     if(count($dat_foto)>0){
-	    $foto=$dat_foto[0][0];
+	 $dat_usr_bd=$dat_usr_bd["message"];
+	 if(count($dat_usr_bd)>0){
+	    $foto=$dat_usr_bd[0]["foto"];
+		echo "<h1 id='msg_welcome'>Bienvenido</h1>";
+	
      }
      if($foto!="" && $foto!="..."){
 	    echo "<div class='box_image'><image id='welcome_img' src='images/".$foto."' width='150' height='150'/></div>";
@@ -123,12 +128,11 @@ if(count($_SESSION)>0){
      else{
        echo "<div class='box_image'><image id='welcome_img' src='images/user_login.jpg' width='150' height='150'/></div>";
      }
-     echo "<br><p class='info_user'>Usuario:".$usuario."</p>";
+     echo "<br><p class='info_user'>Usuario:".$user."</p>";
      echo "<br>";
-     echo "<p class='info_user'>Tipo de Usuario:".$nivel."</p>";
+     echo "<p class='info_user'>Tipo de Usuario:".$permiso_user."</p>";
      echo "</div>";
-
-  }
+   
 }
 else{
 	header("location: loggin.php");

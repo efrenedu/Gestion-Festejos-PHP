@@ -67,65 +67,91 @@
 <?php  
 /*Verify no Exist Illegal Access from User*/
 
-   session_start();
-   require "conexion_bd.php";
-   if(count($_SESSION)>0){
-      $usuario = $_SESSION['username'];
-      $nivel=$_SESSION['acceso_user'];
-	  if (!isset($usuario)) {
-	     header("location: loggin.php");
-		 exit();
-      }
-	  else{
-		   if($nivel!="administrador"){
-	          header("location: paginaprincipal.php");
-              exit();		 
-           }
-		   $_SESSION['lastPage_user']="gestion_usuarios.php";
-	  }
-   }
-   else{
-	    header("location: loggin.php");
-	    exit();
+session_start();
+require_once __DIR__."/../../private/festejos/db_config.php";  
+require_once __DIR__."/../../private/festejos/jwt.php";
+if(count($_SESSION)>0){
+     $path_keySecret=__DIR__."/../../private/festejos/secretToken.json";
+     if(!file_exists($path_keySecret)){
+	     echo "<div id='error_msg'><h2 id='error_text'>Error Obteniendo Datos del Token del Servidor</h2></div>";
+	     echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+         echo "<a class='boton1' href='salir.php'>Volver</a>";
+	     echo "</div>";
+	     exit;
+     }
+     $data_secretKey=json_decode(file_get_contents($path_keySecret),true);
+	 $token=$_SESSION["Token_User"];
+	 $res=validar_token($token,$data_secretKey["Token"]);
+	 if($res["Valido"]=="False"){
+		header("location: salir.php");
+		exit;
     }
-
-  //show the list of users except the User Admin
-  echo"<h2 id='title1'>Gestion de Usuarios</h2>";
-  echo"<div class='Table_Container'><table onmouseenter='enter_table()' onmouseleave='exit_table()' ><caption id='titulo_tabla'>Lista de Usuarios</caption>";
-  echo"<tr style='padding:3px;text-align:center;background-color:rgb(49,75,141);color:white'><td>Usuario</td><td>Permiso</td><td>Bloqueado</td></tr>";
-  if(validar_conexion()){
-	$data=get_data_dict("usuario",["nombre_usuario","contrasena","permiso","bloqueado"],4,-1,-1);
-    if(count($data)>0){
-		$index=0;
-		foreach($data as $dat){
-			if($dat["permiso"]!="administrador" && $dat["nombre_usuario"]!="admin"){
-			   $bloq=$dat["bloqueado"];
-			   if($bloq=="false"){
-				   $bloq="No";
-			   }
-			   else{
-				   $bloq="Si";
-			   }
-			   echo "<tr id='row".strval($index)."' onclick='select_row(this)' style='width:25%;background:rgb(255,250,239);'>";
-			   echo "<td>".$dat["nombre_usuario"]."</td>";
-			   echo "<td>".$dat["permiso"]."</td>";
-			   echo "<td>".$bloq."</td>";
-			   echo "</tr>";
-			   $index+=1;
-			}	
-		}
-		
-	}
-	else{
-		for($i=0;$i<10;$i++ ){
-			echo "<tr id='row".strval($i)."' style='width:25%;background:rgb(231,238,255);'>";
-			echo "<td></td>";
-			echo "<td></td>";
-			echo "<td></td>";
-			echo "</tr>";
-		}
-	}
+	$acceso=$res["Message"]["Acceso"];
+	$usuario_actual=$res["Message"]["Id_usr"];
+	if($acceso!="administrador"){
+	     header("location: paginaprincipal.php");
+         exit();		 
+    }
+	$_SESSION['lastPage_user']="gestion_usuarios.php";
+  
 }
+else{
+	 header("location: loggin.php");
+	 exit();
+}
+
+//show the list of users except the User Admin
+echo"<h2 id='title1'>Gestion de Usuarios</h2>";
+echo"<div class='Table_Container'><table onmouseenter='enter_table()' onmouseleave='exit_table()' ><caption id='titulo_tabla'>Lista de Usuarios</caption>";
+echo"<tr style='padding:3px;text-align:center;background-color:rgb(49,75,141);color:white'><td>Usuario</td><td>Permiso</td><td>Bloqueado</td></tr>";
+$res_conex=get_conexion();
+if($res_conex!="OK"){
+	echo"</table></div>";
+    echo "<br><br>";
+    exit;
+}
+
+$cond_data=array("conditions_Names"=>array("permiso"),"conditions_Values"=>array("administrador"),"condition_Types"=>array("and"),"conditions_Verify"=>array("!="));	 	  		
+$data=get_data("usuario",["nombre_usuario","permiso","bloqueado"],$cond_data,null,true);
+if($data["status"]=="Error"){
+	echo"</table></div>";
+    echo "<br><br>";
+    exit;
+}
+$data=$data["message"];
+if(count($data)<=0){
+	for($i=0;$i<10;$i++ ){
+		echo "<tr id='row".strval($i)."' style='width:25%;background:rgb(231,238,255);'>";
+		echo "<td></td>";
+		echo "<td></td>";
+		echo "<td></td>";
+		echo "</tr>";
+    }
+	echo"</table></div>";
+    echo "<br><br>";
+    exit;
+}
+
+$index=0;
+foreach($data as $dat){
+	$bloq=$dat["bloqueado"];
+	if($bloq=="false"){
+		$bloq="No";
+    }
+	else{
+		$bloq="Si";
+	}
+	echo "<tr id='row".strval($index)."' onclick='select_row(this)' style='width:25%;background:rgb(255,250,239);'>";
+	echo "<td>".$dat["nombre_usuario"]."</td>";
+    echo "<td>".$dat["permiso"]."</td>";
+	echo "<td>".$bloq."</td>";
+	echo "</tr>";
+	$index+=1;
+}	
+		
+		
+	
+
 echo"</table></div>";
 echo "<br><br>";
 ?>

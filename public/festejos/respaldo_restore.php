@@ -67,219 +67,228 @@
 <?php 
 
 /*Verify No Exist Illegal Access*/
-require "conexion_bd.php";
 session_start();
+require_once __DIR__."/../../private/festejos/db_config.php";
+require_once __DIR__."/../../private/festejos/jwt.php";
+/*Verify No Exist Illegal Access*/
 $usuario="";
 if(count($_SESSION)>0){
-  $usuario=$_SESSION['username'];
-  $nivel=$_SESSION['acceso_user'];
-  if (!isset($usuario)) {
-      header("location: loggin.php");
-	  exit();
-  }
-  else{
-	  if($nivel!="administrador"){
-	      header("location: paginaprincipal.php"); 
-          exit();		  
-      }
-	  $last_page= $_SESSION['lastPage_user'];
-      $_SESSION['lastPage_user']="respaldo_restore_bd.php";    
-      if($last_page!="respaldar_bd.php"){
+     $path_keySecret=__DIR__."/../../private/festejos/secretToken.json";
+     if(!file_exists($path_keySecret)){
+	     echo "<div id='error_msg'><h2 id='error_text'>Error Obteniendo Datos del Token del Servidor</h2></div>";
+	     echo "<image id='error_img' src='images/incorrecto.png' width='150' height='150'/><br><br>";
+         echo "<a class='boton1' href='salir.php'>Volver</a>";
+	     echo "</div>";
+	     exit;
+     }
+     $data_secretKey=json_decode(file_get_contents($path_keySecret),true);
+	 $token=$_SESSION["Token_User"];
+	 $res=validar_token($token,$data_secretKey["Token"]);
+	 if($res["Valido"]=="False"){
+		header("location: salir.php");
+		exit;
+    }
+	$dat=$res["Message"];
+	$permiso=$dat["Acceso"];
+	$usuario=$res["Message"]["Id_usr"];
+	if($permiso!="administrador"){
+		header("location: paginaprincipal.php");
+        exit();
+	}
+	$last_page= $_SESSION['lastPage_user'];
+    $_SESSION['lastPage_user']="respaldo_restore_bd.php";    
+    if($last_page!="respaldar_bd.php"){
 		  header("location: paginaprincipal.php"); 
 		  exit();
-	  }
-  }
+    }
 }
 else{
-    header("location: loggin.php"); 
-	exit();
+	 header("location: loggin.php");
+	 exit();
+}
+if(count($_POST)<=0){
+	 echo "<div id='error_msg'><h2 id='error_text'>Error Faltan Datos</h2></div>";
+	 echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+     echo "<a class='boton1' href='paginaprincipal.php'>Volver</a>";
+	 echo "</div>";
+	 exit;
+}
+if(!isset($_POST["accion"])){
+	 echo "<div id='error_msg'><h2 id='error_text'>Error Datos Invalidos</h2></div>";
+	 echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+     echo "<a class='boton1' href='paginaprincipal.php'>Volver</a>";
+	 echo "</div>";
+	 exit;
+}
+/*Process the Request to Save or Restore BD data*/
+$acc=$_POST["accion"];
+$res_conex=get_conexion();
+if($res_conex!="OK"){
+	 echo "<div id='error_msg'><h2 id='error_text'>Error {$res_conex}</h2></div>";
+	 echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+     echo "<a class='boton1' href='paginaprincipal.php'>Volver</a>";
+	 echo "</div>";
+	 exit;
 }
 
-/*Process the Request to Save or Restore BD data*/
-if(count($_POST)>0){
-	if(isset($_POST["accion"])){
-	     if($_POST["accion"]=="respaldo"){			
-			if(validar_conexion()){				
-				$ruta_respaldo=__DIR__.DIRECTORY_SEPARATOR."respaldos".DIRECTORY_SEPARATOR;
-			    for ($j=0;$j<count($tablas_list);$j++){
-				    $tabl=$tablas_list[$j];
-					if(file_exists($ruta_respaldo.$tabl.".csv")){
-						unlink($ruta_respaldo.$tabl.".csv");
-					}
-				    $f_tabla=fopen($ruta_respaldo.$tabl.".csv","w+");
-					$data_tabla=get_data($tabl,$fields_tablas[$j],count($fields_tablas[$j]),-1,-1);
-					$str_temp="";
-					if(count($data_tabla)>0){
-					     foreach ($data_tabla as $dat_t){
-						     for ($i=0;$i<count($dat_t);$i++){
-							     $str_temp=$str_temp.$dat_t[$i];
-							     if($i<count($dat_t)-1){
-							  	    $str_temp=$str_temp.";";
-							    }
-						    }
-							$str_temp=$str_temp.";\n";
-					    }
-					    file_put_contents($ruta_respaldo.$tabl.".csv",$str_temp);
-					    fclose($f_tabla);
-					}
-			    }
-			    $fecha=strval(date("d-m-Y"));
-			    $zip=new ZipArchive();
-				$zip_server_name="respaldos_zips".DIRECTORY_SEPARATOR."respaldo-".$fecha.".zip";
-			    $nombre_zip=__DIR__.DIRECTORY_SEPARATOR.$zip_server_name;
-				$ruta_zip=__DIR__;
-			    $files_contains=array();
-			    if($zip->open($nombre_zip,ZipArchive::CREATE |ZipArchive::OVERWRITE)){
-				     $archivos=new RecursiveIteratorIterator(new RecursiveDirectoryIterator(__DIR__.DIRECTORY_SEPARATOR."respaldos"),RecursiveIteratorIterator::LEAVES_ONLY);
-				     foreach ($archivos as $f){
-					    if($f->isDir()){
-						    continue;
-					    }
-					    $ruta_abs=$f->getRealPath();
-					    $nombre_file=basename($ruta_abs);
-					    $zip->addFile($ruta_abs,$nombre_file);
-						$files_contains[]="respaldos".DIRECTORY_SEPARATOR.$nombre_file;  
-				     }
-					 if(count($files_contains)>0){
-				        $res=$zip->close();
-				         if($res){
-							$data_reporte=array("id_reporte_usr"=>generate_id("reporte_usuario","id_reporte_usr",true) , "nombre_usuario"=>$usuario , "accion"=>"Respaldar BD" ,"fecha"=>strval(date("d-m-Y")),"hora"=>strval(date("H:i:s")));
-			                add_data_dict("reporte_usuario",$data_reporte);
-	                         echo"<div>
-							       <h3>El Respaldo esta listo para Descargarse</h3>
-								   <a href='".$zip_server_name."'>Download</a>
-							      </div>";
-				         }
-				         else{
-						    echo "<div id='error_msg'><h2 id='error_text'>Error Creando Respaldo</h2></div>";
-                            echo "<a class='boton1' href='loggin.php'>Volver</a>";
-				        }
-					 }
-					 else{
-						  echo "<div id='error_msg'><h2 id='error_text'>Error Creando Respaldo </h2></div>";
-                          echo "<a class='boton1' href='loggin.php'>Volver</a>";
-					 } 
-			    }
-			    else{
-				   echo "<div id='error_msg'><h2 id='error_text'>Error Accediendo al Servidor</h2></div>";
-                   echo "<a class='boton1' href='loggin.php'>Volver</a>";
-			    }
-		    }
-			else{
-				 echo "<div id='error_msg'><h2 id='error_text'>Error de Conexion</h2></div>";
-                 echo "<a class='boton1' href='loggin.php'>Volver</a>";
-	             echo "</div>";
+if($acc=="respaldo"){			
+	$ruta_respaldo=__DIR__.DIRECTORY_SEPARATOR."respaldos".DIRECTORY_SEPARATOR;
+	$dat_respaldo=respald_bd();
+	if($dat_respaldo["status"]=="Error"){
+		echo "<div id='error_msg'><h2 id='error_text'>Error {$dat_respaldo['message']}</h2></div>";
+	    echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+        echo "<a class='boton1' href='paginaprincipal.php'>Volver</a>";
+	    echo "</div>";
+	    exit;
+	}
+	$dat_respaldo=$dat_respaldo["data"];
+	
+	foreach ($dat_respaldo as $tabl=>$dat_table){
+		if(file_exists($ruta_respaldo.$tabl.".csv")){
+			unlink($ruta_respaldo.$tabl.".csv");
+		}
+		$f_tabla=fopen($ruta_respaldo.$tabl.".csv","w+");
+		$lines="";
+		foreach($dat_table as $row){
+           $line_row="";
+		   foreach($row as $field_row=>$value_field){
+			   $line_row=$line_row.$value_field.";";
+		   }
+		   $line_row=$line_row."\n";
+		   $lines=$lines.$line_row;
+		}
+       	file_put_contents($ruta_respaldo.$tabl.".csv",$lines);
+		fclose($f_tabla);	
+	}
+	$fecha=strval(date("d-m-Y"));
+	$zip=new ZipArchive();
+	$zip_server_name="respaldos_zips".DIRECTORY_SEPARATOR."respaldo-".$fecha.".zip";
+	$nombre_zip=__DIR__.DIRECTORY_SEPARATOR.$zip_server_name;
+	$ruta_zip=__DIR__;
+	$files_contains=array();
+	if($zip->open($nombre_zip,ZipArchive::CREATE |ZipArchive::OVERWRITE)){
+		$archivos=new RecursiveIteratorIterator(new RecursiveDirectoryIterator(__DIR__.DIRECTORY_SEPARATOR."respaldos"),RecursiveIteratorIterator::LEAVES_ONLY);
+			foreach ($archivos as $f){
+				if($f->isDir()){
+					 continue;
+				}
+				$ruta_abs=$f->getRealPath();
+				$nombre_file=basename($ruta_abs);
+				$zip->addFile($ruta_abs,$nombre_file);
+				$files_contains[]="respaldos".DIRECTORY_SEPARATOR.$nombre_file;  
 			}
-		 }
-		 else{
-			 if(count($_FILES)>0){
-				 if(validar_conexion()){
-				   copy($_FILES["source"]["tmp_name"],$_FILES["source"]["name"]);
-                   $nombre=$_FILES["source"]["name"];
-                   $dir="respaldos_zips".DIRECTORY_SEPARATOR.$nombre;
-                   move_uploaded_file($_FILES["source"]["tmp_name"],$dir);
-				   if(file_exists(__DIR__.DIRECTORY_SEPARATOR.$nombre)){
-						unlink(__DIR__.DIRECTORY_SEPARATOR.$nombre);
-				   }
-				   $zip=new ZipArchive();
-				   $zip_server_name=$dir;
-			       $nombre_zip=__DIR__.DIRECTORY_SEPARATOR.$dir;
-		           $ruta_files=__DIR__.DIRECTORY_SEPARATOR."respaldos";
-			       $files_contains=array();
-			       if($zip->open($nombre_zip)){
-					    $zip->extractTo($ruta_files);
-						$zip->close();
-						$error=false;
-						activate_foraneos(false);
-						for ($j=0;$j<count($tablas_list);$j++){
-				              $tabl=$tablas_list[$j];
-							  $f_name=$ruta_files.DIRECTORY_SEPARATOR.$tabl.".csv";
-				              if(file_exists($f_name)==false){
-								  $error=true;
-							  }
-							  else{
-								  $f=fopen($f_name,"r+");
-								  $permiso_open=true;
-								  clearstatcache();
-								  if(filesize($f_name)==0){$permiso_open=false;}
-								  $rows=array();
-								  $temp_cad="";
-								  if($permiso_open==true){
-								     $temp_data=fread($f,filesize($f_name));
-									 for ($i=0;$i<strlen($temp_data);$i++){
-									     $last_char="";
-										 if($temp_cad!=""){
-											 $last_char=$temp_cad[strlen($temp_cad)-1];
-										 }
-									     if($temp_data[$i]=="\n" && $last_char==";"){
-											 $temp_cad=substr($temp_cad, 0, -1);
-										     $rows[]=$temp_cad;
-										     $temp_cad="";
-									     }
-								        else{
-										     $temp_cad=$temp_cad.$temp_data[$i];
-									    }
-								     }
-								  }
-								  reset_tabla($tabl);
-								  if(count($rows)>0){
-								      foreach($rows as $tabla_row){
-									      $df_tabla=explode(";",$tabla_row);
-									      add_data($tabl,$df_tabla,count($df_tabla));
-								      }
-								  }
-								  fclose($f);
-								  unlink("respaldos".DIRECTORY_SEPARATOR.$tabl.".csv");
-							  }
-				        }
-						activate_foraneos(true);
-						$data_reporte=array("id_reporte_usr"=>generate_id("reporte_usuario","id_reporte_usr",true) , "nombre_usuario"=>$usuario , "accion"=>"Restaurar BD" ,"fecha"=>strval(date("d-m-Y")),"hora"=>strval(date("H:i:s")));
-			            add_data_dict("reporte_usuario",$data_reporte);
-						if($error==false){
-					        echo"<h2 id='title1'>Restauracion de Base de Datos Realizada Exitosamente</h2>
-                            <br><a href='paginaprincipal.php' class='boton1'>Aceptar</a>
-				             ";
-						}
-						else{
-							 echo "<div id='error_msg'><h2 id='error_text'>Error , Restauracion Incompleta Faltaron Algunos Archivos del Respaldo</h2></div>";
-                             echo "<a class='boton1' href='loggin.php'>Volver</a>";
-	                         echo "</div>"; 
-						}
-				   }
-				   else{
-					  echo "<div id='error_msg'><h2 id='error_text'>Error Leyendo Respaldo</h2></div>";
-                      echo "<a class='boton1' href='loggin.php'>Volver</a>";
-	                  echo "</div>"; 
-				   } 
-				   if(file_exists($nombre_zip)){
-						unlink($nombre_zip);
-				   }
-				 }
-				 else{
-					 echo "<div id='error_msg'><h2 id='error_text'>Error de Conexion</h2></div>";	                
-                     echo "<a class='boton1' href='loggin.php'>Volver</a>";
-	                 echo "</div>"; 
-				 }
-			 }
-			 else{  
-			     echo "<div id='error_msg'><h2 id='error_text'>Error de Data</h2></div>";
+			if(count($files_contains)<=0){
+				 echo "<div id='error_msg'><h2 id='error_text'>Error Obteniendo Datos del Token del Servidor</h2></div>";
+	             echo "<div id='error_msg'><h2 id='error_text'>Error Creando Respaldo </h2></div>";
                  echo "<a class='boton1' href='loggin.php'>Volver</a>";
-	             echo "</div>";
-			 }
-		 }
+		         exit;
+			}
+			$res=$zip->close();
+			if($res){
+				  $id_report=generate_id("reporte_usuario","id_reporte_usr");
+				  if($id_report["status"]!="Error"){
+					$data_reporte=array("id_reporte_usr"=>$id_report["message"] , "nombre_usuario"=>$usuario , "accion"=>"Respaldar BD" ,"fecha"=>strval(date("d-m-Y")),"hora"=>strval(date("H:i:s")));
+					add_data("reporte_usuario",$data_reporte,true,true); 
+				  }
+				  echo"<div>
+						 <h3>El Respaldo esta listo para Descargarse</h3>
+						<a href='".$zip_server_name."'>Download</a>
+						</div>";
+			}
+			else{
+				echo "<div id='error_msg'><h2 id='error_text'>Error Obteniendo Datos del Token del Servidor</h2></div>";
+				echo "<div id='error_msg'><h2 id='error_text'>Error Creando Respaldo</h2></div>";
+                echo "<a class='boton1' href='loggin.php'>Volver</a>";
+			}
+			
 	}
 	else{
-	   echo "<div id='error_msg'><h2 id='error_text'>Error de Data2</h2></div>";
-       echo "<a class='boton1' href='loggin.php'>Volver</a>";
-	   echo "</div>";
+		echo "<div id='error_msg'><h2 id='error_text'>Error Obteniendo Datos del Token del Servidor</h2></div>";       
+		echo "<div id='error_msg'><h2 id='error_text'>Error Accediendo al Servidor</h2></div>";
+        echo "<a class='boton1' href='loggin.php'>Volver</a>";
 	}
+		   
 }
 else{
+	if(count($_FILES)<=0){
+		 echo "<div id='error_msg'><h2 id='error_text'>Faltan Datos</h2></div>";
+	     echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+         echo "<a class='boton1' href='paginaprincipal.php'>Volver</a>";
+	     echo "</div>";
+	     exit;
+		
+	}
+	if(!isset($_FILES["source"])){
+		 echo "<div id='error_msg'><h2 id='error_text'>Datos Invalidos</h2></div>";
+	     echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+         echo "<a class='boton1' href='paginaprincipal.php'>Volver</a>";
+	     echo "</div>";
+	     exit;
+		
+	}
+	copy($_FILES["source"]["tmp_name"],$_FILES["source"]["name"]);
+    $nombre=$_FILES["source"]["name"];
+	$posibles=array(".zip",".rar");
+	$valid_format=false;
+	foreach($posibles as $posible_target){
+		$size=strlen($posible_target);
+	    if(substr($nombre,-$size,$size)==$posible_target){
+		    $valid_format=true;
+		    break;
+	    }
+	}
+	if($valid_format==false){
+	   echo "<div id='error_msg'><h2 id='error_text'>El Archivo de Respaldo solo puede ser ZIP o RAR</h2></div>";
+	   echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+       echo "<a class='boton1' href='paginaprincipal.php'>Volver</a>";
+	   echo "</div>";
+	     
+  	   if(file_exists(__DIR__.DIRECTORY_SEPARATOR.$nombre)){
+		     unlink(__DIR__.DIRECTORY_SEPARATOR.$nombre);
+	   }
+	   exit;
+	}
 	
-	 echo "<div id='error_msg'><h2 id='error_text'>Error de Data</h2></div>";
-     echo "<a class='boton1' href='loggin.php'>Volver</a>";
-	 echo "</div>";
+    $dir="respaldos_zips".DIRECTORY_SEPARATOR.$nombre;
+    move_uploaded_file($_FILES["source"]["tmp_name"],$dir);
+	if(file_exists(__DIR__.DIRECTORY_SEPARATOR.$nombre)){
+		unlink(__DIR__.DIRECTORY_SEPARATOR.$nombre);
+	}
+	
+	$zip=new ZipArchive();
+	$zip_server_name=$dir;
+	$nombre_zip=__DIR__.DIRECTORY_SEPARATOR.$dir;
+	$ruta_files=__DIR__.DIRECTORY_SEPARATOR."respaldos";
+	$files_contains=array();
+	if($zip->open($nombre_zip)){
+		$zip->extractTo($ruta_files);
+		$zip->close();
+		$error=false;
+		$archivos=new RecursiveIteratorIterator(new RecursiveDirectoryIterator(__DIR__.DIRECTORY_SEPARATOR."respaldos"),RecursiveIteratorIterator::LEAVES_ONLY);
+		$file_names=array();
+		foreach ($archivos as $f){
+			if($f->isDir()){
+				continue;
+			}
+			$ruta_abs=$f->getRealPath();
+			$nombre_file=basename($ruta_abs);
+			$file_names[]=$nombre_file;
+		}			  
+		foreach ($file_names as $target_name){
+			$target_path=$ruta_files.DIRECTORY_SEPARATOR.$target_name."csv";
+			if(file_exists($target_path)){
+				unlink($target_path);
+			}
+	    }  
+	   if(file_exists($nombre_zip)){
+	         unlink($nombre_zip);
+	   }
+	}			
+			 
 }
+	
+
+
 
 ?>
 </div>

@@ -20,56 +20,200 @@
 
 /*Manage the Access from Users*/
 
-require "conexion_bd.php";
+require_once __DIR__."/../../private/festejos/db_config.php";
+require_once __DIR__."/../../private/festejos/jwt.php";
+
 require "fechas.php";
-verificar_conexion();
-set_default();
+
+if(count($_POST)<2){
+	 echo "<div id='error_msg'><h2 id='error_text'>Faltan Datos</h2></div>";
+	 echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+     echo "<a class='boton1' href='loggin.php'>Volver</a>";
+     echo "</div>";
+	 exit;
+}
+if(!isset($_POST["nombre"]) || !isset($_POST["contrasena"])){
+	 echo "<div id='error_msg'><h2 id='error_text'>Faltan Datos</h2></div>";
+	 echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+     echo "<a class='boton1' href='loggin.php'>Volver</a>";
+     echo "</div>";
+	 exit;
+}
+$status_conex=get_conexion();
+if($status_conex!="OK"){
+	 echo "<div id='error_msg'><h2 id='error_text'>{$status_conex}</h2></div>";
+	 echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+     echo "<a class='boton1' href='loggin.php'>Volver</a>";
+     echo "</div>";
+	 exit;
+}
+verify_db();
 session_start();
-$usuario = strtolower($_POST['nombre']);
+$usuario = $_POST['nombre'];
 $clave = $_POST['contrasena'];
-
-if(isset($usuario) && isset($clave)){
-
-  $clave=encript($clave);
-  $data =get_data_dict("usuario",["nombre_usuario","permiso","bloqueado","id_intento"],4,["nombre_usuario","contrasena"],[$usuario,$clave]);
-  $data2=get_data_dict("usuario",["nombre_usuario","id_intento","bloqueado"],3,["nombre_usuario"],[$usuario]);
-  date_default_timezone_set('America/Caracas');
-  if (count($data)>0) {
-	   $bloq=$data[0]["bloqueado"];
-	   if($bloq=="true"){
-		 //User Blocked
-		 $data_intentos=get_data_dict("intentos_usuario",["last_fecha","last_hora"],2,["id_intento"],[$data[0]["id_intento"]]);
-      	 if(count($data_intentos)>0){
-            if($data_intentos[0]["last_fecha"]!="..."){	
-				$f_actual=strval(date("d-m-Y"));
-				$h_actual=strval(date("H:i:s"));
-		        $t_usr=strtotime($data_intentos[0]["last_fecha"]." ".$data_intentos[0]["last_hora"]."+1 hour");
-		        $bloqueo_d=strval(date("d-m-Y H:i:s",$t_usr));
-		        $bloqueo_d=explode(" ",$bloqueo_d);
-				if(count($bloqueo_d)==2){
-				    $date_bloqueo=$bloqueo_d[0];
-				    $time_bloqueo=$bloqueo_d[1];
-		            if( $date_bloqueo==$f_actual || (comparar($date_bloqueo,$f_actual)<0)){
-						 if($h_actual==$time_bloqueo || (calcular_tiempo($time_bloqueo,$h_actual)<0)){
-							update_data("intentos_usuario",["num_intentos","last_fecha","last_hora"],["0","...","..."],3,["id_intento"],[$data[0]["id_intento"]]);
-	                        update_data("usuario",["bloqueado"],["false"],1,["nombre_usuario"],[$usuario]);
-						    $bloq="false";
-						 }
-				   }
-				}
+$join_data=array();
+$join_data["intentos_usuario"]=array("query_field"=>array("num_intentos","last_fecha","last_hora"),"share_fields"=>array("field"=>"id_intento","table_reference"=>"usuario"),"Conditions_join"=>null);				   
+$cond_data=array("conditions_Names"=>array("nombre_usuario"),"conditions_Values"=>array($usuario),"condition_Types"=>array("and"),"conditions_Verify"=>array("="));	 
+$data_res =get_data("usuario",array("nombre_usuario","permiso","CI_trabaj","bloqueado","contrasena"),$cond_data,$join_data,true);
+if($data_res["status"]=="Error"){
+	  echo "<div id='error_msg'><h2 id='error_text'>Error:{$data_res['message']}</h2></div>";
+	  echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+      echo "<a class='boton1' href='loggin.php'>Volver</a>";
+	  echo "</div>";
+	  exit;
+}
+$data=$data_res["message"];
+date_default_timezone_set('America/Caracas');
+if(count($data)<=0){
+	  echo "<div id='error_msg'><h2 id='error_text'>Usuario Inexistente</h2></div>";
+	  echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+      echo "<a class='boton1' href='loggin.php'>Volver</a>";
+	  echo "</div>";
+	  exit;
+}	
+$pass_bd=$data[0]["contrasena"];
+$bloq=$data[0]["bloqueado"];
+$minutes_dif=0;
+$last_loggin="";
+$last_fecha=$data[0]["last_fecha"];
+$temp_fecha=explode("/",$last_fecha);
+$last_hora=$data[0]["last_hora"];
+$num_intentos=$data[0]["num_intentos"];
+if(count($temp_fecha)>=3){
+	$formatted_date=$temp_fecha[0]."-".$temp_fecha[1]."-".$temp_fecha[2];
+    $last_loggin=$formatted_date." ".$last_hora;
+}
+if($last_loggin!=""){
+	$date_intento=new DateTime($last_loggin);
+	$actual_date=new DateTime();
+	$dif_time=$date_intento->diff($actual_date);
+	$minutes_dif=($dif_time->days*24*60)+($dif_time->h*60)+$dif_time->i;
+}
+if($bloq=="true"){
+	if($minutes_dif>60){
+		$bloq="false";
+		$num_intentos=0;
+	}
+}
+if(password_verify($clave,$pass_bd) && $bloq=="false"){
+	$path_keySecret=__DIR__."/../../private/festejos/secretToken.json";
+    if(!file_exists($path_keySecret)){
+	    echo "<div id='error_msg'><h2 id='error_text'>Error Obteniendo Datos para Generar Token del Usuario</h2></div>";
+	    echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+        echo "<a class='boton1' href='loggin.php'>Volver</a>";
+	    echo "</div>";
+        exit;
+    }
+	$fecha_str=strval(date("d/m/Y"));
+    $hora_str=strval(date("H:i:s"));
+	$data_secretKey=json_decode(file_get_contents($path_keySecret),true);
+	$datos_session=["CI_trabaj"=>$data[0]["CI_trabaj"],"Nivel_Acceso"=>$data[0]["permiso"],"Id_User"=>$usuario];
+	$dur_token=3600;
+	$token_client=generate_tokenLogin($datos_session,$data_secretKey["Token"],$dur_token);
+    $join_data=array();
+    $join_data["intentos_usuario"]=array("query_field"=>array("num_intentos"=>"0","last_fecha"=>"...","last_hora"=>"..."),"share_fields"=>array("field"=>"id_intento","table_reference"=>"usuario"),"Conditions_join"=>null);
+	$cond_data=array("conditions_Names"=>array("nombre_usuario"),"conditions_Values"=>array($usuario),"condition_Types"=>array("and"),"conditions_Verify"=>array("="));	 
+	$res_update=update_data("usuario",array("bloqueado"=>"false"),$cond_data,$join_data);
+	if($res_update["status"]=="Error"){
+		echo "<div id='error_msg'><h2 id='error_text'> Error: {$res_update['message']}</h2></div>";
+	    echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+        echo "<a class='boton1' href='loggin.php'>Volver</a>";
+	    echo "</div>";
+        exit;
+	}
+	$fecha_str=strval(date("d-m-Y"));;
+	$id_reporte_usr=generate_id("reporte_usuario","id_reporte_usr");
+	if($id_reporte_usr["status"]=="Error"){
+		echo "<div id='error_msg'><h2 id='error_text'>Error: {$id_reporte_usr['message']}</h2></div>";
+	    echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+        echo "<a class='boton1' href='loggin.php'>Volver</a>";
+	    echo "</div>";
+        exit;
+	}
+	$dat_report=array("id_reporte_usr"=>$id_reporte_usr["message"],"nombre_usuario"=>$usuario,"accion"=>"Iniciar Sesion","fecha"=>$fecha_str,"hora"=>$hora_str);
+	$res_add=add_data("reporte_usuario",$dat_report,true,true);
+	if($res_add["status"]=="Error"){
+		echo "<div id='error_msg'><h2 id='error_text'>Error: {$res_add['message']}</h2></div>";
+	    echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+        echo "<a class='boton1' href='loggin.php'>Volver</a>";
+	    echo "</div>";
+        exit;
+	}
+	$_SESSION['username']=$usuario;
+    $_SESSION['acceso_user']=$data[0]["permiso"];
+    $_SESSION['lastPage_user']="loggin.php";
+	$_SESSION["Token_User"]=$token_client;	
+	header ("location: paginaprincipal.php");	
+    exit;	
+}
+else{
+	//Loggin Fail
+	$fecha_str=strval(date("d/m/Y"));
+    $hora_str=strval(date("H:i:s"));
+	if($bloq=="true"){
+		 echo "<div id='error_msg'><h2 id='error_text'>Usuario Bloqueado</h2></div>";
+	     echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+         echo "<a class='boton1' href='loggin.php'>Volver</a>";
+	     echo "</div>";
+	     exit;
+	}
+	else{
+		if($num_intentos>=0){
+			if($minutes_dif>20){
+				$num_intentos=0;
 			}
-		 }			 
-	   }
-	   if($bloq=="false"){
-		    //Valid Access
-		    update_data("intentos_usuario",["num_intentos","last_fecha","last_hora"],["0","...","..."],3,["id_intento"],[$data[0]["id_intento"]]);
-			$data_reporte=array("id_reporte_usr"=>strval(generate_id("reporte_usuario","id_reporte_usr",true)) , "nombre_usuario"=>$data[0]["nombre_usuario"] , "accion"=>"Iniciar Sesion" ,"fecha"=>strval(date("d-m-Y")),"hora"=>strval(date("H:i:s")));
-			add_data_dict("reporte_usuario",$data_reporte);
+			if($num_intentos<3){
+		        $num_intentos+=1;
+	        }
+		}
+		if($num_intentos>=3){
+			$bloq="true";
+		}
+	}
+	$join_data=array();
+    $join_data["intentos_usuario"]=array("query_field"=>array("num_intentos"=>strval($num_intentos),"last_fecha"=>$fecha_str,"last_hora"=>$hora_str),"share_fields"=>array("field"=>"id_intento","table_reference"=>"usuario"),"Conditions_join"=>null);
+	$cond_data=array("conditions_Names"=>array("nombre_usuario"),"conditions_Values"=>array($usuario),"condition_Types"=>array("and"),"conditions_Verify"=>array("="));	 
+	$res_update=update_data("usuario",array("bloqueado"=>$bloq),$cond_data,$join_data,true);
+	if($res_update["status"]=="Error"){
+		echo "<div id='error_msg'><h2 id='error_text'>Datos Incorrectos, Error: {$res_update['message']}</h2></div>";
+	    echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+        echo "<a class='boton1' href='loggin.php'>Volver</a>";
+	    echo "</div>";
+        exit;
+	}
+	$fecha_str=strval(date("d-m-Y"));;
+	$id_reporte_usr=generate_id("reporte_usuario","id_reporte_usr");
+	if($id_reporte_usr["status"]=="Error"){
+		echo "<div id='error_msg'><h2 id='error_text'>Datos Incorrectos, Error: {$id_reporte_usr['message']}</h2></div>";
+	    echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+        echo "<a class='boton1' href='loggin.php'>Volver</a>";
+	    echo "</div>";
+        exit;
+	}
+	$dat_report=array("id_reporte_usr"=>$id_reporte_usr["message"],"nombre_usuario"=>$usuario,"accion"=>"Inicio de Sesion Fallido","fecha"=>$fecha_str,"hora"=>$hora_str);
+	$res_add=add_data("reporte_usuario",$dat_report,true,true);
+	if($res_add["status"]=="Error"){
+		echo "<div id='error_msg'><h2 id='error_text'>Datos Incorrectos, Error: {$res_add['message']}</h2></div>";
+	    echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+        echo "<a class='boton1' href='loggin.php'>Volver</a>";
+	    echo "</div>";
+        exit;
+	}
+	echo "<div id='error_msg'><h2 id='error_text'>Datos Incorrectos</h2></div>";
+	echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+    echo "<a class='boton1' href='loggin.php'>Volver</a>";
+	echo "</div>";
+	exit;
+}
+/*
+else if($bloq=="false" || $bloq=="False"){
+		$data_reporte=array("id_reporte_usr"=>strval(generate_id("reporte_usuario","id_reporte_usr",true)) , "nombre_usuario"=>$data[0]["nombre_usuario"] , "accion"=>"Iniciar Sesion" ,"fecha"=>strval(date("d-m-Y")),"hora"=>strval(date("H:i:s")));
+			add_data("reporte_usuario",$data_reporte);
 			$_SESSION['username'] = $data[0]["nombre_usuario"];
             $_SESSION['acceso_user'] =$data[0]["permiso"];
 
             //Remove old Reports of Users
-			$dat_reports_usr=get_data_dict("reporte_usuario",["id_reporte_usr","fecha"],2,-1,-1);
+			$dat_reports_usr=get_data("reporte_usuario",["id_reporte_usr","fecha"],2,-1,-1);
 			if(count($dat_reports_usr)>0){
 				foreach ($dat_reports_usr as $rep){
 					$id_rep=$rep["id_reporte_usr"];
@@ -82,7 +226,7 @@ if(isset($usuario) && isset($clave)){
 				}
 			}
             //Remove old Reports of Process
-			$dat_reports=get_data_dict("reporte",["id_reporte","src_reporte","fecha"],3,-1,-1);
+			$dat_reports=get_data("reporte",["id_reporte","src_reporte","fecha"],3,-1,-1);
 			if(count($dat_reports)>0){
 				foreach ($dat_reports as $rep){
 					$id_rep=$rep["id_reporte"];
@@ -134,132 +278,9 @@ if(isset($usuario) && isset($clave)){
 					 }
 				 }
 			}
-			header ("location: paginaprincipal.php");
-	   }
-	   else{
-		   //Invalid Access: User Blocked
-		   echo "<div id='error_msg'><h2 id='error_text'>El Usuario Esta Bloqueado</h2></div>";
-	       echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
-           echo "<a class='boton1' href='loggin.php'>Volver</a>";
-	       echo "</div>";
-	    }
-  }
-  else if(count($data2)>0){
-	  //Fail Password
-	  $id_intento=$data2[0]["id_intento"];
-	  $bloq=$data2[0]["bloqueado"];
-	  $data_intentos=get_data_dict("intentos_usuario",["num_intentos","last_fecha","last_hora"],3,["id_intento"],[$id_intento]);
-	  if(count($data_intentos)>0){
-		 $fecha_actual=date("d-m-Y H:i:s");
-	     $fecha=strval(date("d-m-Y"));
-		 $hora=strval(date("H:i:s"));
-		 
-		 if($bloq=="false"){  
-			 
-			  if($data_intentos[0]["last_fecha"]!="..."){
-			      $t_usr=strtotime($data_intentos[0]["last_fecha"]." ".$data_intentos[0]["last_hora"]."+20 minute");
-		          $date_end_intentos=strval(date("d-m-Y H:i:s",$t_usr));
-		          $date_end_intentos=explode(" ", $date_end_intentos);
-				  if(count($date_end_intentos)==2){
-					  $date_intento=$date_end_intentos[0];
-					  $time_intento=$date_end_intentos[1];
-					   if( $date_intento==$fecha || (comparar($date_intento,$fecha)<0)){
-					     
-						 if($hora==$time_intento || (calcular_tiempo($time_intento,$hora)<0)){
- 					        
-							
-				            update_data("intentos_usuario",["num_intentos","last_fecha","last_hora"],["0","...","..."],3,["id_intento"],[$id_intento]);
-		                    $data_intentos=get_data_dict("intentos_usuario",["num_intentos","last_fecha","last_hora"],3,["id_intento"],[$id_intento]);
-         
-						 }
-				     }
-				  }
-		       }
-			  $num_intentos=intval($data_intentos[0]["num_intentos"]);
-			  $bloqueado=false;
-		      if($num_intentos+1<3){
-				$num_intentos=$num_intentos+1;  
-			  }
-			  else{
-				 $num_intentos=3;  
-				 $bloqueado=true;
-				 update_data("usuario",["bloqueado"],["true"],1,["nombre_usuario"],[$usuario]);
-			  }
-			  update_data("intentos_usuario",["num_intentos","last_fecha","last_hora"],[strval($num_intentos),$fecha,$hora],3,["id_intento"],[$id_intento]);
-		      if($bloqueado==false){
-			      echo "<div id='error_msg'><h2 id='error_text'>Datos Incorrectos</h2></div>";
-	              if($num_intentos<2){
-			          echo "<div id='error_msg2'><h2 id='error_text'>Tiene ".$num_intentos." Intento fallido de Inicio de Sesion</h2></div>";
-			      }
-			      else{
-				      echo "<div id='error_msg2'><h2 id='error_text'>Tiene ".$num_intentos." Intentos fallidos de Inicio de Sesion, le recomendamos esperar 20 min antes de volver a iniciar Sesion para evitar bloqueo de su cuenta</h2></div>";
-			      }
-			      echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
-                  echo "<a class='boton1' href='loggin.php'>Volver</a>";
-	              echo "</div>";
-			  }
-			  else{
-				  echo "<div id='error_msg'><h2 id='error_text'>Usuario Bloqueado</h2></div>";
-	             
-				  echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
-                  echo "<a class='boton1' href='loggin.php'>Volver</a>";
-	 
-	              echo "</div>";  
-			  }
-	      }
-           else{
-			    $t_usr=strtotime($data_intentos[0]["last_fecha"]." ".$data_intentos[0]["last_hora"]."+1 hour");
-			    $bloqueo_d=strval(date("d-m-Y H:i:s",$t_usr));
-		        $bloqueo_d=explode(" ",$bloqueo_d);
-				if(count($bloqueo_d)==2){
-				    $date_bloqueo=$bloqueo_d[0];
-				    $time_bloqueo=$bloqueo_d[1];
-			        if( $date_bloqueo==$fecha || (comparar($date_bloqueo,$fecha)<0)){
-						 if($hora==$time_bloqueo || (calcular_tiempo($time_bloqueo,$hora)<0)){
-							update_data("intentos_usuario",["num_intentos","last_fecha","last_hora"],["1",$fecha,$hora],3,["id_intento"],[ $id_intento]);
-	                        update_data("usuario",["bloqueado"],["false"],1,["nombre_usuario"],[$usuario]);
-						    $bloq="false";
-							echo "<div id='error_msg'><h2 id='error_text'>Datos Incorrectos</h2></div>";
-	                        echo "<div id='error_msg2'><h2 id='error_text'>Tiene 1 Intento fallido de Inicio de Sesion</h2></div>";
-			                echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
-                            echo "<a class='boton1' href='loggin.php'>Volver</a>";
-	                        echo "</div>";
-						 }
-				   }
-				}
-				
-				if($bloq!="false"){
-	       
-		           echo "<div id='error_msg'><h2 id='error_text'>El Usuario Esta Bloqueado</h2></div>";
-	               echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
-                   echo "<a class='boton1' href='loggin.php'>Volver</a>";
-	               echo "</div>";
-				}
-		   }
-		  
-	  }
-	   else{
-		   echo "<div id='error_msg'><h2 id='error_text'>Error de Data</h2></div>";
-	       echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
-           echo "<a class='boton1' href='loggin.php'>Volver</a>";
-	       echo "</div>";
-	    }
-  }
-  else {
-	  //User Inexistent
-	  echo "<div id='error_msg'><h2 id='error_text'>Datos Incorrectos</h2></div>";
-	  echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
-      echo "<a class='boton1' href='loggin.php'>Volver</a>";
-	  echo "</div>";
-  }
-}
-else{
-	 //Data Invalid
-	 echo "<div id='error_msg'><h2 id='error_text'>Error de Data</h2></div>";
-	 echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
-     echo "<a class='boton1' href='loggin.php'>Volver</a>";
-     echo "</div>";
-}
+
+}*/
+
 ?>
 </center>
 

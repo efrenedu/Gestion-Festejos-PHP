@@ -18,14 +18,22 @@
 <div id="content1">
 <?php 
 /*verify if the user have session open*/
+require_once __DIR__."/../../private/festejos/jwt.php";
 session_start();
+
 if(count($_SESSION)>0){
-	$usuario = $_SESSION['username'];
-    $nivel=$_SESSION['acceso_user'];
-    $_SESSION['lastPage_user']="loggin.php";  
-    if (isset($usuario)) {
-	   header("location: paginaprincipal.php");  
-   } 
+	 $path_keySecret=__DIR__."/../../private/festejos/secretToken.json";
+	 if(!file_exists($path_keySecret)){
+	     exit;
+     }
+	 $data_secretKey=json_decode(file_get_contents($path_keySecret),true);
+	 $token=$_SESSION["Token_User"];
+	 $res=validar_token($token,$data_secretKey["Token"]);
+	 if($res["Valido"]=="True"){
+		$_SESSION['lastPage_user']="loggin.php";  
+		header("location: paginaprincipal.php");  
+	 }
+  
 }
 ?>
   <h2 id="title1">Iniciar Sesion</h2><br>

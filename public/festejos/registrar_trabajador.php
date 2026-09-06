@@ -66,26 +66,37 @@
 <div  id="content2">
 <?php  
 
-/*Verify No Exist Illegal Access*/
+//Verify No Exist Ilegal Access from User
+require_once __DIR__."/../../private/festejos/jwt.php";
 session_start();
 if(count($_SESSION)>0){
-  $usuario = $_SESSION['username'];
-  $nivel=$_SESSION['acceso_user'];
-  if (!isset($usuario)) {
-	header("location: loggin.php");
-  }
-  else{
-	  if($nivel!="administrador"){
-	     header("location: paginaprincipal.php"); 
-		 exit();
+     $path_keySecret=__DIR__."/../../private/festejos/secretToken.json";
+     if(!file_exists($path_keySecret)){
+	     echo "<div id='error_msg'><h2 id='error_text'>Error Obteniendo Datos del Token del Servidor</h2></div>";
+	     echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+         echo "<a class='boton1' href='salir.php'>Volver</a>";
+	     echo "</div>";
+	     exit;
      }
-     $_SESSION['lastPage_user']="registrar_trabajador.php";
-  }
-   
+     $data_secretKey=json_decode(file_get_contents($path_keySecret),true);
+	 $token=$_SESSION["Token_User"];
+	 $res=validar_token($token,$data_secretKey["Token"]);
+	 if($res["Valido"]=="False"){
+		header("location: salir.php");
+		exit;
+    }
+	$acceso=$res["Message"]["Acceso"];
+	if($acceso!="administrador"){
+		header("location:paginaprincipal.php");
+	}
+	$_SESSION['lastPage_user']="registrar_trabajador.php"; 
+  	
 }
 else{
-	header("location: loggin.php");
+	 header("location: loggin.php");
+	 exit();
 }
+
 
 ?>
 
@@ -99,7 +110,7 @@ else{
 
         <?php 
 		  /*set the List of "Trabajadores" On the Select Node*/
-          require "conexion_bd.php";
+          require_once __DIR__."/../../private/festejos/db_config.php";
           $first_op="<option value=''>Elegir";
           for($k=0;$k<45;$k++){
 	          $first_op=$first_op."&nbsp;";  
@@ -107,45 +118,55 @@ else{
           $first_op=$first_op."</option>";
           echo $first_op;
           $next_html="";
-          if(validar_conexion()){
-	        $listado=get_data_dict("trabajador",["CI_trabaj","id_nombre"],2,-1,-1);
-            $dat_admin=get_data_dict("usuario",["CI_trabaj"],1,["nombre_usuario"],["admin"]);
+          if(get_conexion()=="OK"){
+			
+			$join_data=array();
+            $join_data["nombre"]=array("query_field"=>array("nombre","segundo_nombre","apellido","segundo_apellido"),"share_fields"=>array("field"=>"id_nombre","table_reference"=>"trabajador"),"Conditions_join"=>null); 
+	        $cond_data=array("conditions_Names"=>array("CI_trabaj"),"conditions_Values"=>array("000000"),"condition_Types"=>array("and"),"conditions_Verify"=>array("!="));	 	  
+			
+			$listado=get_data("trabajador",["CI_trabaj"],$cond_data,$join_data,true);
+            if($listado["status"]=="Error"){
+				exit;
+			}
+			$listado=$listado["message"];
+			$cond_data=array("conditions_Names"=>array("permiso","CI_trabaj"),"conditions_Values"=>array("administrador","000000"),"condition_Types"=>array("and","and"),"conditions_Verify"=>array("=","!="));	 	  
+			$dat_admin=get_data("usuario",["CI_trabaj"],$cond_data,null,true);
+			if($dat_admin["status"]=="Error"){
+				exit;
+			}
+			$dat_admin=$dat_admin["message"];
 			$id_admin="000000";
 			if(count($dat_admin)>0){
 				$id_admin=$dat_admin[0]["CI_trabaj"];
 			}
-			if(count($listado>0)){
-		       for ($i=0;$i<count($listado);$i++){
-			       $cedula=$listado[$i]["CI_trabaj"];
-			       $id_name=$listado[$i]["id_nombre"];
-			       $data_name=get_data_dict("nombre",["nombre","segundo_nombre","apellido","segundo_apellido"],4,["id_nombre"],[$id_name]);
-	               if($cedula!="000000"){
-				     if(count($data_name)>0){
-						$is_admin="false";
-						if($cedula==$id_admin){
-							$is_admin="true";
-						}
-				        $nombre=$data_name[0]["nombre"];
-				        if($data_name[0]["segundo_nombre"]!=""){
-					       $nombre=$nombre." ".$data_name[0]["segundo_nombre"];
-				        }
-				        $nombre=$nombre." ".$data_name[0]["apellido"];
-				        if($data_name[0]["segundo_apellido"]!=""){
-					       $nombre=$nombre." ".$data_name[0]["segundo_apellido"];
-				        }
-				        $next_html= $next_html."<option value='".$cedula.";".$is_admin."'>".$nombre."</option>";
-			         }
-				   }
-		      }
-	        }
+			for ($i=0;$i<count($listado);$i++){
+			    $cedula=$listado[$i]["CI_trabaj"];
+			    $id_name=$listado[$i]["id_nombre"];
+			    $is_admin="false";
+				if($cedula==$id_admin){
+					$is_admin="true";
+				}
+				$nombre=$listado[$i]["nombre"];
+				if($listado[$i]["segundo_nombre"]!=""){
+					$nombre=$nombre." ".$listado[$i]["segundo_nombre"];
+				}
+				$nombre=$nombre." ".$listado[$i]["apellido"];
+				if($listado[$i]["segundo_apellido"]!=""){
+					$nombre=$nombre." ".$listado[$i]["segundo_apellido"];
+				}
+				$next_html= $next_html."<option value='".$cedula.";".$is_admin."'>".$nombre."</option>";   
+		    }
+	        
           }
           if($next_html!=""){
 	         echo $next_html;
-          }   
-        ?>
+          }
+          		  
+       ?>
 			
      </select>
      <br><br><br>
+	
      <label class="label_login"> Nombres</label>
      <input id="nombre" type="text" class="input_login" name="nombre" style="margin-right:30%;" placeholder="Ingresar Nombre"><br><br>
      <label  class="label_login"> Apellidos</label>
@@ -185,7 +206,7 @@ else{
        <option value='Directivo'>Directivo</option>     
 	   <option value='Administrativo'>Administrativo</option>
        <option value='Atencion al Cliente'>Atencion al Cliente</option>
-	   <option value='Obrero'>Artista</option>
+	   <option value='Artista'>Artista</option>
 	   <option value='Obrero'>Obrero</option>
      </select>
      <br><br>
@@ -230,6 +251,7 @@ else{
 <div id="error_form11" class="error_msg" style="display:none;">
    <p>Cedula Del trabajador ya Registrada</p>
 </div>
+
 <div id="ModalMessage" class="ModalContainer">
   <div class="ModalX" onclick="closeModal_byName('ModalMessage')"> X </div>
    <div class="ModalInner">

@@ -66,112 +66,153 @@
 <div  id="content2">
 <?php  
 
-  /*Verify No Exist Illegal Access*/
-  require "conexion_bd.php";
-  session_start();
-  $usuario_actual="";
-  if(count($_SESSION)>0){
-    $usuario = $_SESSION['username'];
-	$usuario_actual=$usuario;
-    $nivel=$_SESSION['acceso_user'];
-    if (!isset($usuario)){
-	   header("location: loggin.php"); 
-       exit();	   
+  /*Verify No Eixst Illegal Access*/
+require_once __DIR__."/../../private/festejos/db_config.php";  
+require_once __DIR__."/../../private/festejos/jwt.php";
+session_start();
+$usuario_actual="";
+if(count($_SESSION)>0){
+     $path_keySecret=__DIR__."/../../private/festejos/secretToken.json";
+     if(!file_exists($path_keySecret)){
+	     echo "<div id='error_msg'><h2 id='error_text'>Error Obteniendo Datos del Token del Servidor</h2></div>";
+	     echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+         echo "<a class='boton1' href='salir.php'>Volver</a>";
+	     echo "</div>";
+	     exit;
+     }
+     $data_secretKey=json_decode(file_get_contents($path_keySecret),true);
+	 $token=$_SESSION["Token_User"];
+	 $res=validar_token($token,$data_secretKey["Token"]);
+	 if($res["Valido"]=="False"){
+		header("location: salir.php");
+		exit;
     }
-	else{
-		$last_page=$_SESSION['lastPage_user'];
-        $_SESSION['lastPage_user']="send_registro_user.php";
-		if($last_page!="registro_usuarios.php"){
-			 header("location: paginaprincipal.php"); 
-			 exit();
-		}
-		if($nivel!="administrador"){
-	       header("location: paginaprincipal.php");
-           exit();	 
-        }
+	$acceso=$res["Message"]["Acceso"];
+	$usuario_actual=$res["Message"]["Id_usr"];
+	if($acceso!="administrador"){
+		header("location:paginaprincipal.php");
 	}
-	
-  }
-  else{  
-	 header("location: loggin.php");   
-     exit();	 
-  }
+	$last_page=$_SESSION['lastPage_user'];
+    $_SESSION['lastPage_user']="send_registro_user.php";
+	if($last_page!="registro_usuarios.php"){
+		 header("location: paginaprincipal.php"); 
+		 exit();
+	}
+      
+}
+else{
+	 header("location: loggin.php");
+	 exit();
+}
+
+  
   /*Process the request to register the user*/
-  if(count($_POST)>0){
-    if( !isset($_POST['user_name']) || !isset($_POST['pass1']) || !isset($_POST['permiso']) || !isset($_POST["trabajador"])) {
-		echo "<image src='images/incorrecto.png' width='120' height='120'/>";
-		echo "<div id='error_msg2'><h2 id='error_text'>error datos invalidos</h2></div>";
-		echo "<a class='boton2' href='registro_usuarios.php' >aceptar</a>";
-   }
-   else{
-	   date_default_timezone_set('America/Caracas');
-	   $usuario=strtolower($_POST['user_name']);
-       $pass=$_POST['pass1'];
-	   $permiso=$_POST['permiso'];
-	   $trabajador=$_POST['trabajador'];
-	   if(isset($_POST["p1"]) && isset($_POST["p2"]) && isset($_POST["p3"]) && isset($_POST["p4"]) && isset($_POST["p5"]) && isset($_POST["p6"])){
-         if(isset($_POST["r1"]) &&	isset($_POST["r2"])	&& isset($_POST["r3"]) && isset($_POST["r4"]) && isset($_POST["r5"]) && isset($_POST["r6"])){
-           if(validar_conexion()){
-		       if(id_exist("usuario","nombre_usuario",$usuario)==false){
-		           $preguntas=array($_POST["p1"],$_POST["p2"],$_POST["p3"],$_POST["p4"],$_POST["p5"],$_POST["p6"]);
-			       $respuestas=array($_POST["r1"],$_POST["r2"],$_POST["r3"],$_POST["r4"],$_POST["r5"],$_POST["r6"]);
-				   if(isset($_POST["p7"])){
-					   if($_POST["p7"]!="" && $_POST["r7"]!=""){
-					     $preguntas[]=$_POST["p7"];
-					     $respuestas[]=$_POST["r7"];
-					   }
-				   }
-				   if(isset($_POST["p8"])){
-					   if($_POST["p8"]!="" && $_POST["r8"]!=""){
-					     $preguntas[]=$_POST["p8"];
-					     $respuestas[]=$_POST["r8"];
-					   }
-				   }
-				   $dat_intentos=array("id_intento"=>generate_id("intentos_usuario","id_intento",false),"num_intentos"=>"0","last_fecha"=>"...","last_hora"=>"...");
-	               add_data_dict("intentos_usuario",$dat_intentos);
-		           $pass=encript($pass);
-		           $dat=array("nombre_usuario"=>$usuario ,"contrasena"=>$pass ,"permiso"=>$permiso ,"bloqueado"=>"false","foto"=>"..." , "id_intento"=>$dat_intentos["id_intento"],"CI_trabaj"=>$trabajador);
-				   add_data_dict("usuario",$dat);
-		           for($i=0;$i<count($preguntas);$i++){
-					   $d_preg=array("id_pregunta"=>generate_id("pregunta_secreta","id_pregunta",true) ,"nombre_usuario"=>$dat["nombre_usuario"] , "pregunta"=>$preguntas[$i] ,"respuesta"=>strtolower($respuestas[$i]),"numero"=>strval($i+1));
-				       add_data_dict("pregunta_secreta",$d_preg);
-				   }
-				   $dat_reporte=array("id_reporte_usr"=>generate_id("reporte_usuario","id_reporte_usr",true) , "nombre_usuario"=>$usuario_actual , "accion"=>"Registrar Usuario" ,"fecha"=>strval(date("d-m-Y")),"hora"=>strval(date("H:i:s")));
-				   add_data_dict("reporte_usuario",$dat_reporte);
-		           echo "<image src='images/correcto.png' width='120' height='120'/>";
-		           echo "<div id='correcto_msg'><h2 id='correcto_text'>Usuario Registrado Satisfactoriamente</h2></div>";
-		           echo "<a id='boton_acceptar' class='boton2' href='gestion_usuarios.php' >Aceptar</a>";
-			   }
-			   else{
-			        echo "<image src='images/incorrecto.png' width='120' height='120'/>";
-		            echo "<div id='error_msg2'><h2 id='error_text'>Nombre de Usuario ya Existente</h2></div>";
-		            echo "<a class='boton2' href='registro_usuarios.php' >Aceptar</a>";
-		        }
-		   }
-		   else{
-				echo "<image src='images/incorrecto.png' width='120' height='120'/>";
-		        echo "<div id='error_msg2'><h2 id='error_text'>Fallo al Conectar</h2></div>";
-		        echo "<a class='boton2' href='registro_usuarios.php' >Aceptar</a>";
-		   }
-		 }
-		 else{
-		     echo "<image src='images/incorrecto.png' width='120' height='120'/>";
-		     echo "<div id='error_msg2'><h2 id='error_text'>Error de Data</h2></div>";
-		     echo "<a class='boton2' href='registro_usuarios.php' >Aceptar</a>";
-		 }
-	   }
-	   else{
-		  echo "<image src='images/incorrecto.png' width='120' height='120'/>";
-		  echo "<div id='error_msg2'><h2 id='error_text'>Error de Data</h2></div>";
-		  echo "<a class='boton2' href='registro_usuarios.php' >Aceptar</a>"; 
-	   }
-   }
-  }
-  else{
+  if(count($_POST)<=0){
 	 echo "<image src='images/incorrecto.png' width='120' height='120'/>";
-	 echo "<div id='error_msg2'><h2 id='error_text'>Error Datos Invalidos</h2></div>";
+	 echo "<div id='error_msg2'><h2 id='error_text'>Faltan Datos</h2></div>";
 	 echo "<a class='boton2' href='registro_usuarios.php' >Aceptar</a>";	  
+     exit;
   }
+  if( !isset($_POST['user_name']) || !isset($_POST['pass1']) || !isset($_POST['permiso']) || !isset($_POST["trabajador"])) {
+		echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+		echo "<div id='error_msg2'><h2 id='error_text'>Datos Invalidos</h2></div>";
+		echo "<a class='boton2' href='registro_usuarios.php' >aceptar</a>";
+        exit;
+  }
+   date_default_timezone_set('America/Caracas');
+   $usuario=strtolower($_POST['user_name']);
+   $pass=$_POST['pass1'];
+   $permiso=$_POST['permiso'];
+   if($permiso=="administrador"){
+	    echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+		echo "<div id='error_msg2'><h2 id='error_text'>Permiso del Usuario a Registrar Invalido</h2></div>";
+		echo "<a class='boton2' href='registro_usuarios.php' >aceptar</a>";
+        exit; 
+   }
+   $trabajador=$_POST['trabajador'];
+   $params_required=array("p1","p2","p3","p4","p5","p6","r1","r2","r3","r4","r5","r6");
+   foreach ($params_required as $param){
+         if(!isset($_POST[$param])){
+			echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+		    echo "<div id='error_msg2'><h2 id='error_text'>Faltan Datos</h2></div>";
+		    echo "<a class='boton2' href='registro_usuarios.php' >aceptar</a>";
+            exit; 
+		 }
+   }	   
+   $res_conex=get_conexion();
+   if($res_conex!="OK"){
+	    echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+		echo "<div id='error_msg2'><h2 id='error_text'>{$res_conex}</h2></div>";
+		echo "<a class='boton2' href='registro_usuarios.php' >aceptar</a>";
+        exit; 
+   }
+   $exist=id_exist("usuario","nombre_usuario",$usuario);
+   if($exist["status"]=="Error"){
+	    echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+		echo "<div id='error_msg2'><h2 id='error_text'>{$exist['message']}</h2></div>";
+		echo "<a class='boton2' href='registro_usuarios.php' >aceptar</a>";
+        exit; 
+   }
+   $exist=$exist["message"];
+   if($exist!="False"){
+	    echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+		echo "<div id='error_msg2'><h2 id='error_text'>Usuario ya Registrado</h2></div>";
+		echo "<a class='boton2' href='registro_usuarios.php' >aceptar</a>";
+        exit;
+   }
+	$preguntas=array($_POST["p1"],$_POST["p2"],$_POST["p3"],$_POST["p4"],$_POST["p5"],$_POST["p6"]);
+	$respuestas=array($_POST["r1"],$_POST["r2"],$_POST["r3"],$_POST["r4"],$_POST["r5"],$_POST["r6"]);
+	if(isset($_POST["p7"])){
+		 if($_POST["p7"]!="" && $_POST["r7"]!=""){
+			$preguntas[]=$_POST["p7"];
+		    $respuestas[]=$_POST["r7"];
+		}
+	}
+	if(isset($_POST["p8"])){
+			if($_POST["p8"]!="" && $_POST["r8"]!=""){
+				$preguntas[]=$_POST["p8"];
+				$respuestas[]=$_POST["r8"];
+			}
+	}
+	 $id_intento=generate_id("intentos_usuario","id_intento");
+	 if($id_intento["status"]=="Error"){
+		echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+		echo "<div id='error_msg2'><h2 id='error_text'>Error: {$id_intento['message']}</h2></div>";
+		echo "<a class='boton2' href='registro_usuarios.php' >aceptar</a>";
+        exit;
+	 }
+	 $id_intento=$id_intento["message"];
+	 $dat_intentos=array("id_intento"=>$id_intento,"num_intentos"=>"0","last_fecha"=>"...","last_hora"=>"...");
+	 add_data("intentos_usuario",$dat_intentos,true);
+	 $pass=password_hash($pass,PASSWORD_BCRYPT);
+	 $dat=array("nombre_usuario"=>$usuario ,"contrasena"=>$pass ,"permiso"=>$permiso ,"bloqueado"=>"false","foto"=>"..." , "id_intento"=>$dat_intentos["id_intento"],"CI_trabaj"=>$trabajador);
+	 add_data("usuario",$dat,true);
+	 for($i=0;$i<count($preguntas);$i++){
+		$id_preg=generate_id("pregunta_secreta","id_pregunta");
+	    if($id_preg["status"]=="Error"){
+		   echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+		   echo "<div id='error_msg2'><h2 id='error_text'>Error: {$id_preg['message']}</h2></div>";
+		   echo "<a class='boton2' href='registro_usuarios.php' >aceptar</a>";
+           exit;
+	    }
+	    $id_preg=$id_preg["message"];
+		$d_preg=array("id_pregunta"=>$id_preg ,"nombre_usuario"=>$dat["nombre_usuario"] , "pregunta"=>$preguntas[$i] ,"respuesta"=>strtolower($respuestas[$i]),"numero"=>strval($i+1));
+		add_data("pregunta_secreta",$d_preg,true);
+	}
+	$id_report=generate_id("reporte_usuario","id_reporte_usr");
+    if($id_report["status"]=="Error"){
+		   echo "<image src='images/incorrecto.png' width='120' height='120'/>";
+		   echo "<div id='error_msg2'><h2 id='error_text'>Error: {$id_report['message']}</h2></div>";
+		   echo "<a class='boton2' href='registro_usuarios.php' >aceptar</a>";
+           exit;
+	}
+	$id_report=$id_report["message"];
+	$dat_reporte=array("id_reporte_usr"=>$id_report , "nombre_usuario"=>$usuario_actual , "accion"=>"Registrar Usuario" ,"fecha"=>strval(date("d-m-Y")),"hora"=>strval(date("H:i:s")));
+	add_data("reporte_usuario",$dat_reporte,true,true);
+	echo "<image src='images/correcto.png' width='120' height='120'/>";
+	echo "<div id='correcto_msg'><h2 id='correcto_text'>Usuario Registrado Satisfactoriamente</h2></div>";
+	echo "<a id='boton_acceptar' class='boton2' href='gestion_usuarios.php' >Aceptar</a>";
+			   
 
 ?>
 
