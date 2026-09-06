@@ -1,0 +1,95 @@
+{
+    "seed_data":{
+	   "trabajador":[{"CI_trabaj":"000000","id_nombre":["nombre",{"id_nombre":"","nombre":"default","segundo_nombre":"","apellido":"default","segundo_apellido":""}],
+	                  "cargo":"default","turno":"default","nivel_academico":"default","edad":"0",
+					  "estatus":"default","fecha_ingreso":"Calculate_date"
+				    }
+	    ],
+        "usuario":[{"nombre_usuario":"admin01",
+	             "contrasena":"$2y$10$Gf9z592oruv.1izskvWORebooQRyCcYy4oppluf7.2FHRbYcQGsqW",
+				 "permiso":"administrador","bloqueado":"false",
+	             "foto":"user_login.jpg","id_intento":["intentos_usuario",{"id_intento":"","num_intentos":"0","last_fecha":"","last_hora":""}],
+				 "CI_trabaj":"000000"
+				}
+	    ]
+  },
+  "tables_names":[
+   "intentos_usuario","nombre","trabajador","usuario","cliente","telefono","fiesta",
+    "producto","producto_alquilado","producto_reservado","personal_fiesta",
+    "reporte","reporte_usuario","pregunta_secreta"
+  ],
+  "Alias_Tables":{
+      "intentos_usuario":"iu","nombre":"n","trabajador":"t","usuario":"u","cliente":"cl",
+	  "telefono":"tf","fiesta":"f","producto":"p","producto_alquilado":"pa","producto_reservado":"pr",
+	  "personal_fiesta":"pf","reporte":"rp","reporte_usuario":"rpu","pregunta_secreta":"ps"
+  },
+  "fields_tables":{
+    "intentos_usuario":[{"name":"id_intento","field-type":"PRIMARY KEY"},{"name":"num_intentos","field-type":"field"},
+	                    {"name":"last_fecha","field-type":"field"},{"name":"last_hora","field-type":"field"}
+	],
+	"nombre":[{"name":"id_nombre","field-type":"PRIMARY KEY"},{"name":"nombre","field-type":"field"},
+	        {"name":"segundo_nombre","field-type":"field"},{"name":"apellido","field-type":"field"},
+			{"name":"segundo_apellido","field-type":"field"}
+	],
+	"trabajador":[{"name":"CI_trabaj","field-type":"PRIMARY KEY"},{"name":"id_nombre","field-type":"FOREIGN KEY-nombre:id_nombre"},
+	              {"name":"cargo","field-type":"field"},{"name":"turno","field-type":"field"},
+				  {"name":"nivel_academico","field-type":"field"},{"name":"edad","field-type":"field"},
+				  {"name":"estatus","field-type":"field"},{"name":"fecha_ingreso","field-type":"field"}
+	],
+	"usuario":[{"name":"nombre_usuario","field-type":"PRIMARY KEY"},{"name":"contrasena","field-type":"field"},
+             {"name":"permiso","field-type":"field"},{"name":"bloqueado","field-type":"field"},
+			 {"name":"foto","field-type":"field"},{"name":"id_intento","field-type":"FOREIGN KEY-intentos_usuario:id_intento"},
+			 {"name":"CI_trabaj","field-type":"FOREIGN KEY-trabajador:CI_trabaj"}
+	],
+    "cliente":[{"name":"CI_cliente","field-type":"PRIMARY KEY"},{"name":"id_nombre","field-type":"FOREIGN KEY-nombre:id_nombre"},
+	              {"name":"estatus","field-type":"field"}
+	],
+	"telefono":[{"name":"numero_telefono","field-type":"PRIMARY KEY"},{"name":"CI_trabaj","field-type":"FOREIGN KEY-trabajador:CI_trabaj"},
+	           {"name":"principal","field-type":"field"}       
+	],
+	"fiesta":[{"name":"id_fiesta","field-type":"PRIMARY KEY"},{"name":"estatus","field-type":"field"},
+	         {"name":"CI_cliente","field-type":"FOREIGN KEY-cliente:CI_cliente"},{"name":"fecha","field-type":"field"},
+	         {"name":"hora","field-type":"field"},{"name":"lugar","field-type":"field"},{"name":"publico","field-type":"field"},
+	         {"name":"tipo_fiesta","field-type":"field"},{"name":"costo","field-type":"field"}
+	          
+	],
+	"producto":[{"name":"nombre_producto","field-type":"PRIMARY KEY"},{"name":"serial","field-type":"field"},
+	         {"name":"precio_alquiler","field-type":"field"},{"name":"precio","field-type":"field"},
+			 {"name":"alquilable","field-type":"field"},{"name":"cantidad","field-type":"field"},
+			 {"name":"estatus","field-type":"field"},{"name":"cantidad_disponible","field-type":"field"}
+	          
+	],
+	"producto_alquilado":[{"name":"id_alquilado","field-type":"PRIMARY KEY"},{"name":"nombre_producto","field-type":"FOREIGN KEY-producto:nombre_producto"},
+	         {"name":"formato","field-type":"field"},{"name":"cantidad_alquilada","field-type":"field"},
+			 {"name":"precio_unidad","field-type":"field"},{"name":"CI_cliente","field-type":"FOREIGN KEY-cliente:CI_cliente"},
+			 {"name":"fecha_devolucion","field-type":"field"}
+	          
+	],
+	"producto_reservado":[{"name":"id_reservado","field-type":"PRIMARY KEY"},{"name":"nombre_producto","field-type":"FOREIGN KEY-producto:nombre_producto"},
+	         {"name":"formato","field-type":"field"},{"name":"cantidad_reservada","field-type":"field"},
+			 {"name":"precio_unidad","field-type":"field"},{"name":"id_fiesta","field-type":"field"}
+	          
+	],
+	"personal_fiesta":[{"name":"id_personal_fiesta","field-type":"PRIMARY KEY"},{"name":"CI_trabaj","field-type":"FOREIGN KEY-trabajador:CI_trabaj"},
+	         {"name":"rol","field-type":"field"},{"name":"id_fiesta","field-type":"FOREIGN KEY-fiesta:id_fiesta"}
+	          
+	],
+	"reporte":[{"name":"id_reporte","field-type":"PRIMARY KEY"},{"name":"nombre_usuario","field-type":"FOREIGN KEY-usuario:nombre_usuario"},
+             {"name":"CI_cliente","field-type":"FOREIGN KEY-cliente:CI_cliente"},{"name":"tipo","field-type":"field"},
+	         {"name":"src_reporte","field-type":"field"},{"name":"fecha","field-type":"field"}
+	          
+	],
+
+	"reporte_usuario":[{"name":"id_reporte_usr","field-type":"PRIMARY KEY"},{"name":"nombre_usuario","field-type":"FOREIGN KEY-usuario:nombre_usuario"},
+	                  {"name":"accion","field-type":"field"},{"name":"fecha","field-type":"field"},{"name":"hora","field-type":"field"}
+	],
+    "pregunta_secreta":[{"name":"id_pregunta","field-type":"PRIMARY KEY"},{"name":"nombre_usuario","field-type":"FOREIGN KEY-usuario:nombre_usuario"},
+	                  {"name":"pregunta","field-type":"field"},{"name":"respuesta","field-type":"field"},
+					  {"name":"numero","field-type":"field"}
+	]
+	                     
+  },
+  "add_indexs":{
+    
+  }
+}
