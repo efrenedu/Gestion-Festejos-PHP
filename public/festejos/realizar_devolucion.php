@@ -304,7 +304,7 @@ $pdf->Ln();
 $pdf->MultiCell(0,10, utf8_decode('Devolver Alquiler'), 0, 'C');
 $pdf->Ln();
 $pdf->SetFont('Arial', '', 13);
-$pdf->MultiCell(0, 7, utf8_decode('Emisor:'.$_SESSION['username']), 0, 1);
+$pdf->MultiCell(0, 7, utf8_decode('Emisor:'.$usuario_actual), 0, 1);
 $pdf->Ln();
 $pdf->MultiCell(0, 7, utf8_decode( $prods_devolver), 0, 1);
 $pdf->Ln();

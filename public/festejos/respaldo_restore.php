@@ -148,17 +148,12 @@ if($acc=="respaldo"){
 			unlink($ruta_respaldo.$tabl.".csv");
 		}
 		$f_tabla=fopen($ruta_respaldo.$tabl.".csv","w+");
-		$lines="";
 		foreach($dat_table as $row){
-           $line_row="";
-		   foreach($row as $field_row=>$value_field){
-			   $line_row=$line_row.$value_field.";";
-		   }
-		   $line_row=$line_row."\n";
-		   $lines=$lines.$line_row;
+            $linea=implode(";",$row);
+			fwrite($f_tabla,$linea."\r\n");
 		}
-       	file_put_contents($ruta_respaldo.$tabl.".csv",$lines);
-		fclose($f_tabla);	
+		 fflush($f_tabla);
+		 fclose($f_tabla);	
 	}
 	$fecha=strval(date("d-m-Y"));
 	$zip=new ZipArchive();
@@ -266,16 +261,31 @@ else{
 		$error=false;
 		$archivos=new RecursiveIteratorIterator(new RecursiveDirectoryIterator(__DIR__.DIRECTORY_SEPARATOR."respaldos"),RecursiveIteratorIterator::LEAVES_ONLY);
 		$file_names=array();
+		$abs_paths=array();
+		$tables_names=array();
 		foreach ($archivos as $f){
 			if($f->isDir()){
 				continue;
 			}
 			$ruta_abs=$f->getRealPath();
 			$nombre_file=basename($ruta_abs);
-			$file_names[]=$nombre_file;
-		}			  
-		foreach ($file_names as $target_name){
-			$target_path=$ruta_files.DIRECTORY_SEPARATOR.$target_name."csv";
+			$size_csv=strlen(".csv");
+	        if(substr($nombre_file,-$size_csv,$size_csv)==".csv"){
+		       $file_names[]=$nombre_file;
+			   $abs_paths[]=$ruta_abs;
+			   $tables_names[]=explode(".csv",$nombre_file)[0];
+	        }
+		}
+		$res=restore_bd($abs_paths,$tables_names);
+		if($res["status"]=="Error"){
+			 echo "<div id='error_msg'><h2 id='error_text'>Error {$res['message']}</h2></div>";
+	         echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+             echo "<a class='boton1' href='paginaprincipal.php'>Volver</a>";
+	         echo "</div>";
+	         exit;
+		}
+        foreach ($file_names as $target_name){
+			$target_path=$ruta_files.DIRECTORY_SEPARATOR.$target_name;
 			if(file_exists($target_path)){
 				unlink($target_path);
 			}
@@ -283,6 +293,11 @@ else{
 	   if(file_exists($nombre_zip)){
 	         unlink($nombre_zip);
 	   }
+	   echo"<image src='images/correcto.png' width='120' height='120'/>";
+       echo "<div id='correcto_msg'><h2 id='correcto_text'>Base de Datos Restaurada Satisfactoriamente</h2></div>";
+       echo"<br><a id='boton_acceptar' class='boton2' href='paginaprincipal.php' class='boton1'>Aceptar</a> ";
+
+	   exit;
 	}			
 			 
 }

@@ -107,6 +107,7 @@ if(count($dat_u)<=0){
 }  
 $preguntas=array();
 $respuestas=array();
+$user_request=$dat_u[0]["nombre_usuario"];
 for ($i=0;$i<count($dat_u);$i++){
 	$preguntas[]=$dat_u[$i]["pregunta"];
 	$respuestas[]=$dat_u[$i]["respuesta"];
@@ -118,6 +119,20 @@ while($index2==$index1){
 }
 $p1=$preguntas[$index1];
 $p2=$preguntas[$index2];
+$path_keySecret_Recover=__DIR__."/../../private/festejos/secretToken_recoverPass.json";
+if(!file_exists($path_keySecret_Recover)){
+    echo "<div id='error_msg'><h2 id='error_text'>Error Obteniendo Datos de Token Para Recuperar Contraseñas del Servidor</h2></div>";
+	echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
+    echo "<a class='boton1' href='loggin.php'>Volver</a>";
+    echo "</div>";
+	exit;
+}
+$data_secretKey=json_decode(file_get_contents($path_keySecret_Recover),true);
+$datos_session=["CI_trabaj"=>"None","Nivel_Acceso"=>"Undefined","Id_User"=>$user_request];
+$dur_token=300;
+$token_client=generate_tokenLogin($datos_session,$data_secretKey["Token"],$dur_token);
+$_SESSION["Token_User"]=$token_client;	
+
 echo"<h2 id='title1'>Recuperar Contraseña</h2>
      <br>
 	 <form action='new_pass.php' method='post'>

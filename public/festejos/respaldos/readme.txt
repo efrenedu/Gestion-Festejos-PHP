@@ -1,1 +1,1 @@
-folder required to backup of database
+folder for Store the Backups of Server (Uploaded or Generateds)

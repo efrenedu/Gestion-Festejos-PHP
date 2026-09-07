@@ -276,8 +276,7 @@ if($extra_msg!=""){
 }
 echo "<div id='correcto_msg'><h2 id='correcto_text'>Modificacion Realizada Satsifactoriamente</h2></div>";
 echo "<a id='boton_acceptar' class='boton2' href='gestion_usuarios.php' >Aceptar</a>";
-			
-	  
+
      
 
 

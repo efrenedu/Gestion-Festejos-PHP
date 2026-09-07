@@ -129,7 +129,6 @@ $cantidad = $_POST['cantidad'];
 $accion=$_POST['accion_form'];
 $serial=$_POST['serial'];
 $alquilable=$_POST['alquilable'];
-echo $alquilable;
 $res_conex=get_conexion();
 if($res_conex!="OK"){
 	 echo "<image src='images/incorrecto.png' width='120' height='120'/>";

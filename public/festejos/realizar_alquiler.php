@@ -276,7 +276,7 @@ if($id_report["status"]=="Error"){
 $id_report=$id_report["message"];
 
 $src="reportes/Alquiler".strval($id_report)."_".$fecha_alquiler.".pdf";
-$data_report=array("id_reporte"=>$id_report,"nombre_usuario"=>$_SESSION['username'],"CI_cliente"=>$cedula,"tipo"=>"alquiler","src_reporte"=>$src,"fecha"=>$fecha_alquiler);
+$data_report=array("id_reporte"=>$id_report,"nombre_usuario"=>$usuario,"CI_cliente"=>$cedula,"tipo"=>"alquiler","src_reporte"=>$src,"fecha"=>$fecha_alquiler);
 $res_add=add_data("reporte",$data_report,true);
 if($res_add["status"]=="Error"){
 	echo "<image src='incorrecto.png' width='120' height='120'/>";
@@ -335,7 +335,7 @@ $pdf->Ln();
 $pdf->MultiCell(0,10, utf8_decode('Solicitud de Alquiler '), 0, 'C');
 $pdf->Ln();
 $pdf->SetFont('Arial', '', 13);
-$pdf->MultiCell(0, 7, utf8_decode('Emisor:'.$_SESSION['username']), 0, 1);
+$pdf->MultiCell(0, 7, utf8_decode('Emisor:'.$usuario), 0, 1);
 $pdf->Ln();
 $pdf->MultiCell(0, 7, utf8_decode($prods_alquilar), 0, 1);
 $pdf->Ln();

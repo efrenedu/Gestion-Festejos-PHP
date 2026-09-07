@@ -25,7 +25,8 @@ $usuario="";
 session_start();
 if(count($_SESSION)>0){
      $path_keySecret=__DIR__."/../../private/festejos/secretToken.json";
-     if(!file_exists($path_keySecret)){
+     $path_keySecret_recover=__DIR__."/../../private/festejos/secretToken_recoverPass.json";
+	 if(!file_exists($path_keySecret) || !file_exists($path_keySecret_recover)){
 	     echo "<div id='error_msg'><h2 id='error_text'>Error Obteniendo Datos del Token del Servidor</h2></div>";
 	     echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
          echo "<a class='boton1' href='salir.php'>Volver</a>";
@@ -33,14 +34,25 @@ if(count($_SESSION)>0){
 	     exit;
      }
      $data_secretKey=json_decode(file_get_contents($path_keySecret),true);
+	 $data_secretKey_recover=json_decode(file_get_contents($path_keySecret_recover),true);
 	 $token=$_SESSION["Token_User"];
 	 $res=validar_token($token,$data_secretKey["Token"]);
+	 $res_recover=validar_token($token,$data_secretKey_recover["Token"]);
 	 if($res["Valido"]!="False"){
 		header("location: paginaprincipal.php");
 		exit;
     }
+	if($res_recover["Valido"]=="False"){
+		header("location: loggin.php");
+		exit;
+	}
+	$usuario=$res_recover["Message"]["Id_usr"];
 }
-
+else{
+	header("location: loggin.php");
+	exit;
+	
+}
 if (count($_POST)<=0) {
 	echo "<div id='error_msg'><h2 id='error_text'>Faltan Datos</h2></div>";
 	echo "<image id='error_img' src='images/user_error.png' width='150' height='150'/><br><br>";
@@ -67,7 +79,7 @@ if($res_conex!="OK"){
     echo "</div>";
 	exit;
 }
-$target=$_POST["target"];
+$target=$usuario;
 $exist_usr= id_exist("usuario","nombre_usuario",$target);
 if($exist_usr["status"]=="Error"){
 	echo "<div id='error_msg'><h2 id='error_text'>Error {$exist_usr}</h2></div>";

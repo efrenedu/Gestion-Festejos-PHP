@@ -20,6 +20,96 @@
 
 /*Manage the Access from Users*/
 
+function verify_registers(){
+	  //Remove old Reports of Users
+	  $dat_reports_usr=get_data("reporte_usuario",["id_reporte_usr","fecha"],null,null,true);
+	  if($dat_reports_usr["status"]=="Error"){
+		 return False; 
+	  }
+	  $dat_reports_usr=$dat_reports_usr["message"];
+	  foreach ($dat_reports_usr as $rep){
+		  $id_rep=$rep["id_reporte_usr"];
+		  $fech_rep=$rep["fecha"];
+		  $dif=comparar(strval(date("d-m-Y")),$fech_rep);
+		  if($dif>=60){
+			  $cond_data=array("conditions_Names"=>array("id_reporte_usr"),"conditions_Values"=>array($id_rep),"condition_Types"=>array("and"),"conditions_Verify"=>array("="));	 
+			  delete_data("reporte_usuario",$cond_data,null,true);    
+		  }
+	 }
+	 $dat_reports=get_data("reporte",["id_reporte","src_reporte","fecha"],null,null,true);
+	 if($dat_reports["status"]=="Error"){
+		 return False; 
+	 }
+	 $dat_reports=$dat_reports["message"];
+	 foreach ($dat_reports as $rep){
+		$id_rep=$rep["id_reporte"];
+		$fech_rep=$rep["fecha"];
+		$src=$rep["src_reporte"];
+		$dif=comparar(strval(date("d-m-Y")),$fech_rep);
+		if($dif>=30){
+			//remove report of 30 days olds
+			unlink($src);
+			$cond_data=array("conditions_Names"=>array("id_reporte"),"conditions_Values"=>array($id_rep),"condition_Types"=>array("and"),"conditions_Verify"=>array("="));	
+			delete_data("reporte",$cond_data,null,true);    
+		}
+	 }
+	 
+	 //Remove Pendents Finished Party 
+	 $fiestas=get_data("fiesta",["id_fiesta","fecha","hora"],null,null,true);
+	 if($fiestas["status"]=="Error"){
+        return False;
+	 }		
+     $fiestas=$fiestas["message"];	 
+	 foreach($fiestas as $dat){
+		$target=$dat["id_fiesta"];
+		$dif=comparar($dat["fecha"],strval(date("d-m-Y")));
+		if($dif>=0){
+			continue;
+		}
+		$cond_data=array("conditions_Names"=>array("id_fiesta"),"conditions_Values"=>array($target),"condition_Types"=>array("and"),"conditions_Verify"=>array("="));	 
+     
+	    $data_reserv=get_data("producto_reservado",["nombre_producto","formato","cantidad_reservada"],$cond_data,null,true);
+        if($data_reserv["status"]=="Error"){
+			continue;
+		}
+		$data_reserv=$data_reserv["message"];
+		foreach($data_reserv as $dat){
+			$id_prod=$dat["nombre_producto"];
+			$format=$dat["formato"];
+			$cant=intval($dat["cantidad_reservada"]);
+			if($format=="Pack(P)"){
+				$cant=$cant*10;
+			}
+			else if($format=="Pack(M)"){
+				$cant=$cant*25;
+			}
+			else if($format=="Pack(G)"){
+				$cant=$cant*50;
+			}
+			$cond_data=array("conditions_Names"=>array("nombre_producto"),"conditions_Values"=>array($id_prod),"condition_Types"=>array("and"),"conditions_Verify"=>array("="));	 
+     
+			$prod_dat=get_data("producto",["cantidad_disponible"],$cond_data,null,true);
+			if($prod_dat["status"]=="Error"){
+				continue;
+			}
+			$prod_dat=$prod_dat["message"];
+			if(count($prod_dat)>0){
+
+				$old_cant=intval($prod_dat[0]["cantidad_disponible"]);
+				$old_cant=$old_cant+$cant;
+				update_data("producto",array("cantidad_disponible"=>strval($old_cant),"estatus"=>"disponible"),$cond_data,null,true);
+			}
+									
+		 }
+		 $cond_data=array("conditions_Names"=>array("id_fiesta"),"conditions_Values"=>array($target),"condition_Types"=>array("and"),"conditions_Verify"=>array("="));	 
+     
+		 delete_data("personal_fiesta",$cond_data,null,true);
+		 delete_data("producto_reservado",$cond_data,null,true);
+		 delete_data("fiesta",$cond_data,null,true);    
+		
+	}
+			
+}
 require_once __DIR__."/../../private/festejos/db_config.php";
 require_once __DIR__."/../../private/festejos/jwt.php";
 
@@ -139,10 +229,9 @@ if(password_verify($clave,$pass_bd) && $bloq=="false"){
 	    echo "</div>";
         exit;
 	}
-	$_SESSION['username']=$usuario;
-    $_SESSION['acceso_user']=$data[0]["permiso"];
     $_SESSION['lastPage_user']="loggin.php";
 	$_SESSION["Token_User"]=$token_client;	
+	verify_registers();
 	header ("location: paginaprincipal.php");	
     exit;	
 }
@@ -205,81 +294,7 @@ else{
 	echo "</div>";
 	exit;
 }
-/*
-else if($bloq=="false" || $bloq=="False"){
-		$data_reporte=array("id_reporte_usr"=>strval(generate_id("reporte_usuario","id_reporte_usr",true)) , "nombre_usuario"=>$data[0]["nombre_usuario"] , "accion"=>"Iniciar Sesion" ,"fecha"=>strval(date("d-m-Y")),"hora"=>strval(date("H:i:s")));
-			add_data("reporte_usuario",$data_reporte);
-			$_SESSION['username'] = $data[0]["nombre_usuario"];
-            $_SESSION['acceso_user'] =$data[0]["permiso"];
 
-            //Remove old Reports of Users
-			$dat_reports_usr=get_data("reporte_usuario",["id_reporte_usr","fecha"],2,-1,-1);
-			if(count($dat_reports_usr)>0){
-				foreach ($dat_reports_usr as $rep){
-					$id_rep=$rep["id_reporte_usr"];
-					$fech_rep=$rep["fecha"];
-					$dif=comparar(strval(date("d-m-Y")),$fech_rep);
-					if($dif>=60){
-						//remove report of 60 days olds
-						delete_data("reporte_usuario",["id_reporte_usr"],[$id_rep]);    
-					}
-				}
-			}
-            //Remove old Reports of Process
-			$dat_reports=get_data("reporte",["id_reporte","src_reporte","fecha"],3,-1,-1);
-			if(count($dat_reports)>0){
-				foreach ($dat_reports as $rep){
-					$id_rep=$rep["id_reporte"];
-					$fech_rep=$rep["fecha"];
-					$src=$rep["src_reporte"];
-					$dif=comparar(strval(date("d-m-Y")),$fech_rep);
-					if($dif>=30){
-						//remove report of 30 days olds
-						unlink($src);
-						delete_data("reporte",["id_reporte"],[$id_rep]);    
-					}
-				}
-			}
-			//Remove Pendents Finished Party 
-			$fiestas=get_data_dict("fiesta",["id_fiesta","fecha","hora"],3,-1,-1);
-			if(count($fiestas)>0){
-				 foreach($fiestas as $dat){
-					 $target=$dat["id_fiesta"];
-					 $dif=comparar($dat["fecha"],strval(date("d-m-Y")));
-					 if($dif<0){
-						    $data_reserv=get_data_dict("producto_reservado",["nombre_producto","formato","cantidad_reservada"],3,["id_fiesta"],[$target]);
-                            if(count($data_reserv)>0){
-								foreach($data_reserv as $dat){
-									if(count($dat)>0){
-										$id_prod=$dat["nombre_producto"];
-										$format=$dat["formato"];
-										$cant=intval($dat["cantidad_reservada"]);
-										if($format=="Pack(P)"){
-											$cant=$cant*10;
-										}
-										else if($format=="Pack(M)"){
-											$cant=$cant*25;
-										}
-										else if($format=="Pack(G)"){
-											$cant=$cant*50;
-										}
-										$prod_dat=get_data_dict("producto",["cantidad_disponible"],1,["nombre_producto"],[$id_prod]);
-										if(count($prod_dat)>0){
-											$old_cant=intval($prod_dat[0]["cantidad_disponible"]);
-											$old_cant=$old_cant+$cant;
-											update_data("producto",["cantidad_disponible","estatus"],[strval($old_cant),"disponible"],2,["nombre_producto"],[$id_prod]);
-										}
-									}
-								}
-							}
-							delete_data("personal_fiesta",["id_fiesta"],[$target]);
-			                delete_data("producto_reservado",["id_fiesta"],[$target]);
-							delete_data("fiesta",["id_fiesta"],[$target]);    
-					 }
-				 }
-			}
-
-}*/
 
 ?>
 </center>

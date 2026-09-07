@@ -139,7 +139,7 @@ function get_primary_fields($scheme_data){
 function set_seed_data($seed_data,$primary_keys){
 		date_default_timezone_set('America/Caracas');
         $fecha=strval(date("d-m-Y"));
-	    foreach($seed_data as $tabl=>$data_list){
+		foreach($seed_data as $tabl=>$data_list){
 		   $primary_key_target=$primary_keys[$tabl];
 		   for ($i=0;$i<count($data_list);$i++){
 			  $data_tabl=$data_list[$i];
@@ -1018,81 +1018,84 @@ function set_foreign_check($value){
    }
 }
 //Restore the Data Base
-function restore_bd($data_tables){
+function restore_bd($files_tables,$tables_names){
 	global $conexion;
 	global $bd;
 	if($conexion==null || $conexion==false){
-	    yield ["statuts"=>"Error","message"=>"Conexion Invalida"];
-	    return;	
+	    return ["status"=>"Error","message"=>"Conexion Invalida"];
+	    
 	}
     mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 	$temp_scheme=get_scheme_dat();
 	if($temp_scheme["status"]=="Error"){
-		yield $temp_scheme;
-		return;
+		return $temp_scheme;
+		
 	}
 	$dat_scheme=$temp_scheme["message"];
 	$tables=$dat_scheme["tables_names"];
-	if(count($data_tables)!=count($tables)){
-		yield ["statuts"=>"Error","message"=>"El Numero de Tablas Recibido No Coincide con los de la Base de Datos"];
-	    return;
+	if(count($files_tables)!=count($tables) || count($tables_names)!=count($tables)){
+		return ["status"=>"Error","message"=>"El Numero de Tablas Recibido No Coincide con los de la Base de Datos"];
+	    
 	}
+	$conexion->query("SET UNIQUE_CHECKS=0");
     if(set_foreign_check(false)==false){
-		yield ["status"=>"Error","message"=>"Imposible desactivar Foreign Check"];
-	    return;
+		return ["status"=>"Error","message"=>"Imposible desactivar Foreign Check"];
+	    
 	}
 	$porcent=0;
-	for($i=0;$i<count($tables);$i++){
-		$porcent=round((($i+1)/count($tables))*100);
-		yield[
-		   "status"=>"Procesing",
-		   "message"=>$porcent
-	    ];
-		$tabl_target=$tables[$i];
+	for($i=0;$i<count($files_tables);$i++){
+		$porcent=round((($i+1)/count($files_tables))*100);
+		
+		$file_target=$files_tables[$i];
+		$tabl_target=$tables_names[$i];
 		if(reset_table($tabl_target)==false){
 			mysqli_rollback($conexion);
 			$msg="Imposible Truncar Tabla {$tabl_target}";
 			if(set_foreign_check(true)==false){
 				$msg=$msg.", Error Reactivando Foreign Check";
 			}
-		    yield ["status"=>"Error","message"=>$msg];
-			return;
+			$conexion->query("SET UNIQUE_CHECKS=1");
+		    return  ["status"=>"Error","message"=>$msg];
+			
 		}
-		$dat_tabl_target=$data_tables[$tabl_target];
-		$list_rows=array();
-		for($j=0;$j<count($dat_tabl_target);$j++){
-			$next_row=$dat_tabl_target[$j];
-			foreach ($next_row as $key=>$value){
-			    $list_rows[$j][$key]=$value;
-		    }
+		$escape_path=str_replace("\\","/",$file_target);
+		$request="LOAD DATA INFILE '{$conexion->real_escape_string($escape_path)}' REPLACE INTO TABLE {$tabl_target}";
+		$request=$request." FIELDS TERMINATED BY ';' OPTIONALLY ENCLOSED BY '\"' ESCAPED BY'\\\\' LINES TERMINATED BY '\\r\\n' IGNORE 0 LINES;";   
+		try{
+             mysqli_query($conexion,$request);
+			 $res=mysqli_query($conexion,"SHOW WARNINGS");
+			 while($row=$res->fetch_assoc()){
+				 echo "WARNING: {$row['Message']}<br>";
+			 }
+			
 		}
-		for($j=0;$j<count($list_rows);$j++){
-			$res_add=add_data($tabl_target,$list_rows[$j],true,false,true);
-            if($res_add["status"]=="Error"){
-			    $msg="Error En los Datos Recibidos para la Tabla{$tabl_target}";
-			    if(set_foreign_check(true)==false){
+		catch(Exception $e){
+			 $msg=$e->getMessage();
+			 if(set_foreign_check(true)==false){
 				     $msg=$msg.", Error Reactivando Foreign Check";
-			    }
-				yield ["status"=>"Error","message"=>$msg];
-				return;
-			}
+			  }
+			  $conexion->query("SET UNIQUE_CHECKS=1");
+			  return ["status"=>"Error","message"=>$msg];
+		      
 		}
 	}
 	if(set_foreign_check(true)==false){
-	    yield ["status"=>"Error","message"=>"Restauracion Realizada pero no se pudo Reactivar Foreign Check"];
-	    mysqli_rollback($conexion);
-		return;
+		mysqli_rollback($conexion);
+	    return ["status"=>"Error","message"=>"Restauracion Realizada pero no se pudo Reactivar Foreign Check"];
+	   
+		
 	}
+	$conexion->query("SET UNIQUE_CHECKS=1");
 	$primary_fields=get_primary_fields($dat_scheme);
 	$seed_data=$dat_scheme["seed_data"];
-	$res_seed=set_seed_data($conexion,$bd,$seed_data,$primary_fields);
+	$res_seed=set_seed_data($seed_data,$primary_fields);
 	if($res_seed["status"]=="Error"){
 		mysqli_rollback($conexion);
-		yield $res_seed;
-		return;
+		return $res_seed;
+		
 	}
 	mysqli_commit($conexion);
-	yield ["status"=>"Success","message"=>"Restauracion de La Base de Datos Realizada Exitosamente"];
+	return ["status"=>"Success","message"=>"Restauracion de La Base de Datos Realizada Exitosamente"];
 	
 }
 

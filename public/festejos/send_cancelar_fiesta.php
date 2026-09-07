@@ -223,6 +223,7 @@ for($i=0;$i<count($ids_search);$i++){
                  echo "<a class='boton2' href='cancelar_fiesta.php' >aceptar</a>"; 
                  exit;
 			}
+			$prod_dat=$prod_dat["message"];
 			if(count($prod_dat)<=0){
 				continue;
 			}

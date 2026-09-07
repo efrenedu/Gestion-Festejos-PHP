@@ -104,6 +104,7 @@ else{
 echo"<h2 id='title1'>Gestion de Usuarios</h2>";
 echo"<div class='Table_Container'><table onmouseenter='enter_table()' onmouseleave='exit_table()' ><caption id='titulo_tabla'>Lista de Usuarios</caption>";
 echo"<tr style='padding:3px;text-align:center;background-color:rgb(49,75,141);color:white'><td>Usuario</td><td>Permiso</td><td>Bloqueado</td></tr>";
+
 $res_conex=get_conexion();
 if($res_conex!="OK"){
 	echo"</table></div>";
@@ -118,6 +119,9 @@ if($data["status"]=="Error"){
     echo "<br><br>";
     exit;
 }
+
+
+
 $data=$data["message"];
 if(count($data)<=0){
 	for($i=0;$i<10;$i++ ){
@@ -127,9 +131,6 @@ if(count($data)<=0){
 		echo "<td></td>";
 		echo "</tr>";
     }
-	echo"</table></div>";
-    echo "<br><br>";
-    exit;
 }
 
 $index=0;

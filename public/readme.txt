@@ -1,0 +1,1 @@
+Public Files of Server, Copy the Folder 'Festejos' Inside of your Public Server Folder (htdocs,www,public)

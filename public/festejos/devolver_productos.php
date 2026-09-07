@@ -122,10 +122,6 @@ else{
 		exit;
 	}
 	$data=$data["message"];
-	if(count($data)<=0){
-		exit;
-	}
-	
 	for($i=0;$i<count($data);$i++){
 		$valor=$data[$i]["CI_cliente"];
 		$texto="";
